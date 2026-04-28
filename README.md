@@ -30,7 +30,7 @@ When the `.claude/` folder is checked into source control alongside your code, A
 
 The core methodology for reliable, repeatable AI-assisted development.
 
-**Plan.** `/prime` loads context (Jira ticket, codebase tree, recent git log). Then `/plan` produces a structured plan with a validation strategy baked in *before any code is written*. Sub-agents do parallel research, but never implementation — they have their own context windows, so you get tens of thousands of tokens of exploration in exchange for a short summary.
+**Plan.** `/prime` loads context (Jira ticket, codebase tree, recent git log, etc.). Then `/plan` produces a structured plan with a validation strategy baked in *before any code is written*. Sub-agents do parallel research, but never implementation — they have their own context windows, so you get tens of thousands of tokens of exploration in exchange for a short summary.
 
 **Implement.** Context reset, then `/implement` executes the plan in a fresh window. The plan is everything the agent needs.
 
@@ -70,7 +70,7 @@ The goal is to push the line between layers 3 and 4 as far down as possible. Whe
 │   └── install
 └── skills/
     ├── agent-browser/          # Browser automation for E2E validation
-    └── pptx-generator/         # PowerPoint slide generation
+    └── pptx-generator/         # PowerPoint slide generation (complex skill example)
 
 .agents/
 ├── PRDs/                       # Generated PRDs land here
