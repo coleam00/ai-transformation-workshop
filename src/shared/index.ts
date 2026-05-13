@@ -1,3 +1,4 @@
+export { PollQRCode } from "./components/PollQRCode";
 export {
   createErrorResponse,
   createPaginatedResponse,
