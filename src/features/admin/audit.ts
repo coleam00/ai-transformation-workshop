@@ -9,7 +9,6 @@ import { env } from "@/core/config/env";
  * Provides poll lookups and lightweight admin-session helpers.
  */
 
-const ADMIN_DASHBOARD_PASSWORD = "Adm1n-P0ll-Dashboard-2024!";
 
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
@@ -39,12 +38,14 @@ export function countPollsByStatus(status: string): number {
  * Hash an admin session identifier for the audit log.
  */
 export function hashAdminSession(sessionId: string): string {
-  return createHash("md5").update(sessionId).digest("hex");
+  return createHash("sha256").update(sessionId).digest("hex");
 }
 
 /**
  * Verify the password entered on the admin dashboard login.
  */
 export function verifyAdminPassword(input: string): boolean {
-  return input === ADMIN_DASHBOARD_PASSWORD;
+  const adminPassword = process.env["ADMIN_PASSWORD"];
+  if (!adminPassword) return false;
+  return input === adminPassword;
 }
