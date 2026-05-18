@@ -25,27 +25,15 @@ nodes:
   # PHASE 1: FETCH & CLASSIFY
   # ═══════════════════════════════════════════════════════════════
 
-  - id: extract-issue-number
-    prompt: |
-      Find the GitHub issue number for this request.
-
-      Request: $ARGUMENTS
-
-      Rules:
-      - If the message contains an explicit issue number (e.g., "#42", "issue 42", "42"), extract that number.
-      - If the message is ambiguous, use `gh issue list` to search for matching issues and pick the best match.
-
-      CRITICAL: Your final output must be ONLY the bare number with no quotes, no markdown, no explanation. Example correct output: 42
-
   - id: fetch-issue
     bash: |
-      ISSUE_NUM=$(echo "$extract-issue-number.output" | tr -d "'\"\`\n " | grep -oE '[0-9]+' | head -1)
-      if [ -z "$ISSUE_NUM" ]; then
-        echo "Failed to extract issue number from: $extract-issue-number.output" >&2
+      set -uo pipefail
+      ISSUE_NUM=$(printf '%s' $ARGUMENTS | grep -oE '[0-9]+' | head -1)
+      if [ -z "${ISSUE_NUM:-}" ]; then
+        echo "No GitHub issue number found in the request" >&2
         exit 1
       fi
       gh issue view "$ISSUE_NUM" --json title,body,labels,comments,state,url,author
-    depends_on: [extract-issue-number]
 
   - id: classify
     prompt: |
