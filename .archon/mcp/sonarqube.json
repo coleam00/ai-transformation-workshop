@@ -5,6 +5,8 @@
       "run",
       "-i",
       "--rm",
+      "-v",
+      "archon-sonar-mcp:/app/storage",
       "-e",
       "SONARQUBE_TOKEN",
       "-e",
