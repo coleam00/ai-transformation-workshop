@@ -52,3 +52,7 @@ local.db-wal
 next-env.d.ts
 
 .agents/reports
+
+# archon — local credentials for the SonarQube workflow (never commit)
+.archon/.sonar-env
+.scannerwork/

@@ -1,0 +1,11 @@
+assistant: claude
+
+worktree:
+  baseBranch: main
+  copyFiles:
+    - .env
+    - local.db
+
+defaults:
+  loadDefaultCommands: true
+  loadDefaultWorkflows: true

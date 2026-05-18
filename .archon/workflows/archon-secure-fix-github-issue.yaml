@@ -1,0 +1,197 @@
+name: archon-secure-fix-github-issue
+description: |
+  Use when: User wants to FIX a GitHub issue AND have the result security-verified
+  by SonarQube before a pull request is ever opened.
+  Triggers: "securely fix issue #123", "fix and security-scan", "secure fix".
+  NOT for: Plain issue fixes with no security gate (use archon-fix-github-issue).
+
+  Fork of archon-fix-github-issue with a SonarQube verification gate. DAG workflow:
+  1. Classify the issue (bug/feature/enhancement/etc)
+  2. Route to investigate (bugs) or plan (features)
+  3. Implement the fix/feature
+  4. Run a full SonarQube analysis on the result (sonar-scanner)
+  5. Verify against the SonarQube quality gate via the SonarQube MCP server —
+     autonomously remediate findings and re-scan, up to 3 cycles, until the gate passes
+  6. Only once the gate is GREEN, create a draft PR
+  7. Report results back to the GitHub issue
+
+  Sonar is the verification layer: no code reaches a PR until the quality gate passes.
+
+provider: claude
+model: sonnet
+
+nodes:
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 1: FETCH & CLASSIFY
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: extract-issue-number
+    prompt: |
+      Find the GitHub issue number for this request.
+
+      Request: $ARGUMENTS
+
+      Rules:
+      - If the message contains an explicit issue number (e.g., "#42", "issue 42", "42"), extract that number.
+      - If the message is ambiguous, use `gh issue list` to search for matching issues and pick the best match.
+
+      CRITICAL: Your final output must be ONLY the bare number with no quotes, no markdown, no explanation. Example correct output: 42
+
+  - id: fetch-issue
+    bash: |
+      ISSUE_NUM=$(echo "$extract-issue-number.output" | tr -d "'\"\`\n " | grep -oE '[0-9]+' | head -1)
+      if [ -z "$ISSUE_NUM" ]; then
+        echo "Failed to extract issue number from: $extract-issue-number.output" >&2
+        exit 1
+      fi
+      gh issue view "$ISSUE_NUM" --json title,body,labels,comments,state,url,author
+    depends_on: [extract-issue-number]
+
+  - id: classify
+    prompt: |
+      You are an issue classifier. Analyze the GitHub issue below and determine its type.
+
+      ## Issue Content
+
+      $fetch-issue.output
+
+      ## Classification Rules
+
+      | Type | Indicators |
+      |------|------------|
+      | bug | "broken", "error", "crash", "doesn't work", stack traces, regression |
+      | feature | "add", "new", "support", "would be nice", net-new capability |
+      | enhancement | "improve", "better", "update existing", "extend", incremental improvement |
+      | refactor | "clean up", "simplify", "reorganize", "restructure" |
+      | chore | "update deps", "upgrade", "maintenance", "CI/CD" |
+      | documentation | "docs", "readme", "clarify", "examples" |
+
+      Provide reasoning for your classification.
+    depends_on: [fetch-issue]
+    model: haiku
+    allowed_tools: []
+    output_format:
+      type: object
+      properties:
+        issue_type:
+          type: string
+          enum: ["bug", "feature", "enhancement", "refactor", "chore", "documentation"]
+        title:
+          type: string
+        reasoning:
+          type: string
+      required: [issue_type, title, reasoning]
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 2: INVESTIGATE (bugs) / PLAN (everything else)
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: investigate
+    command: archon-investigate-issue
+    depends_on: [classify]
+    when: "$classify.output.issue_type == 'bug'"
+    context: fresh
+
+  - id: plan
+    command: archon-create-plan
+    depends_on: [classify]
+    when: "$classify.output.issue_type != 'bug'"
+    context: fresh
+
+  # Bridge: archon-fix-issue reads $ARTIFACTS_DIR/investigation.md;
+  # archon-create-plan writes plan.md. Copy plan.md -> investigation.md if needed.
+  - id: bridge-artifacts
+    bash: |
+      if [ -f "$ARTIFACTS_DIR/plan.md" ] && [ ! -f "$ARTIFACTS_DIR/investigation.md" ]; then
+        cp "$ARTIFACTS_DIR/plan.md" "$ARTIFACTS_DIR/investigation.md"
+        echo "Bridged plan.md to investigation.md for implement step"
+      elif [ -f "$ARTIFACTS_DIR/investigation.md" ]; then
+        echo "investigation.md exists from investigate step"
+      else
+        echo "WARNING: No investigation.md or plan.md found — implement may fail"
+      fi
+    depends_on: [investigate, plan]
+    trigger_rule: one_success
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 3: IMPLEMENT
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: implement
+    command: archon-fix-issue
+    depends_on: [bridge-artifacts]
+    context: fresh
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 4: SONARQUBE SECURITY SCAN
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: sonar-scan
+    bash: |
+      set -uo pipefail
+      echo "=== SonarQube analysis: submitting code for scanning ==="
+      if [ -z "${SONAR_TOKEN:-}" ]; then
+        echo "ERROR: SONAR_TOKEN is not set in the environment." >&2
+        exit 1
+      fi
+      echo "Submitting analysis to SonarQube Cloud (branch: main)"
+      sonar-scanner \
+        -Dsonar.token="$SONAR_TOKEN" \
+        -Dsonar.branch.name=main
+      echo "=== SonarQube analysis submitted ==="
+    depends_on: [implement]
+    timeout: 600000
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 5: SONARQUBE VERIFICATION GATE (autonomous remediation loop)
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: sonar-verify
+    command: sonar-verify
+    depends_on: [sonar-scan]
+    context: fresh
+    mcp: .archon/mcp/sonarqube.json
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 6: CREATE DRAFT PR  (only reached after the gate passes)
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: create-pr
+    prompt: |
+      Create a draft pull request for the current branch.
+
+      ## Context
+
+      - **Issue**: $ARGUMENTS
+      - **Classification**: $classify.output
+      - **SonarQube verification**: $sonar-verify.output
+
+      ## Instructions
+
+      1. Check git status — ensure all changes are committed. If uncommitted changes exist, stage and commit them.
+      2. Push the branch: `git push -u origin HEAD`
+      3. Read implementation artifacts from `$ARTIFACTS_DIR/` for context:
+         - `$ARTIFACTS_DIR/investigation.md` or `$ARTIFACTS_DIR/plan.md`
+         - `$ARTIFACTS_DIR/implementation.md`
+         - `$ARTIFACTS_DIR/sonar-verification.md`
+      4. Check if a PR already exists: `gh pr list --head $(git branch --show-current)`
+      5. Look for a PR template at `.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE.md`. Read it if it exists.
+      6. Create a DRAFT PR: `gh pr create --draft --base $BASE_BRANCH`
+         - Title: concise, imperative mood, under 70 chars
+         - Body: summary of the fix, then a **SonarQube Verification** section summarizing the
+           quality gate result and any security findings that were auto-remediated.
+         - Link the issue with `Fixes #...`
+      7. Capture PR identifiers:
+         PR_NUMBER=$(gh pr view --json number -q '.number'); echo "$PR_NUMBER" > "$ARTIFACTS_DIR/.pr-number"
+         PR_URL=$(gh pr view --json url -q '.url'); echo "$PR_URL" > "$ARTIFACTS_DIR/.pr-url"
+    depends_on: [sonar-verify]
+    context: fresh
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 7: REPORT
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: report
+    command: archon-issue-completion-report
+    depends_on: [create-pr]
+    context: fresh

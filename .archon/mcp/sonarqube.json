@@ -1,0 +1,19 @@
+{
+  "sonarqube": {
+    "command": "docker",
+    "args": [
+      "run",
+      "-i",
+      "--rm",
+      "-e",
+      "SONARQUBE_TOKEN",
+      "-e",
+      "SONARQUBE_ORG",
+      "mcp/sonarqube"
+    ],
+    "env": {
+      "SONARQUBE_TOKEN": "$SONAR_TOKEN",
+      "SONARQUBE_ORG": "$SONAR_ORG"
+    }
+  }
+}
