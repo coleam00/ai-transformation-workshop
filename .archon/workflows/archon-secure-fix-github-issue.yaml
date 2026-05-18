@@ -26,9 +26,7 @@ nodes:
   # ═══════════════════════════════════════════════════════════════
 
   - id: fetch-issue
-    bash: |
-      ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oE '[0-9]+' | head -1)
-      gh issue view "${ISSUE_NUM:-2}" --json title,body,labels,comments,state,url,author
+    bash: gh issue view 2 --json title,body,labels,comments,state,url,author
 
   - id: classify
     prompt: |
