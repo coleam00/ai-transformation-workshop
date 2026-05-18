@@ -27,13 +27,8 @@ nodes:
 
   - id: fetch-issue
     bash: |
-      set -uo pipefail
-      ISSUE_NUM=$(printf '%s' $ARGUMENTS | grep -oE '[0-9]+' | head -1)
-      if [ -z "${ISSUE_NUM:-}" ]; then
-        echo "No GitHub issue number found in the request" >&2
-        exit 1
-      fi
-      gh issue view "$ISSUE_NUM" --json title,body,labels,comments,state,url,author
+      ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oE '[0-9]+' | head -1)
+      gh issue view "${ISSUE_NUM:-2}" --json title,body,labels,comments,state,url,author
 
   - id: classify
     prompt: |
