@@ -129,6 +129,7 @@ nodes:
   - id: sonar-scan
     bash: |
       set -uo pipefail
+      export PATH="$HOME/AppData/Roaming/npm:$PATH"
       echo "=== SonarQube analysis: submitting code for scanning ==="
       if [ -z "${SONAR_TOKEN:-}" ]; then
         echo "ERROR: SONAR_TOKEN is not set in the environment." >&2

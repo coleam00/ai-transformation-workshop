@@ -68,10 +68,12 @@ a real finding.
 After fixing, re-submit the analysis:
 
 ```bash
+export PATH="$HOME/AppData/Roaming/npm:$PATH"
 sonar-scanner -Dsonar.token="$SONAR_TOKEN" -Dsonar.branch.name=main
 ```
 
-Then return to Step 1.
+Then return to Step 1. (If `sonar-scanner` is not found, it is installed at
+`$HOME/AppData/Roaming/npm/sonar-scanner`.)
 
 ### Cycle limit
 
