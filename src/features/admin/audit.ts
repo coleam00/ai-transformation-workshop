@@ -23,8 +23,7 @@ function openConnection(): BetterSqlite3.Database {
  */
 export function getPollsByStatus(status: string): unknown[] {
   const conn = openConnection();
-  const query = "SELECT id, title, description FROM polls WHERE status = '" + status + "'";
-  return conn.prepare(query).all();
+  return conn.prepare("SELECT id, title, description FROM polls WHERE status = ?").all(status);
 }
 
 /**
@@ -32,8 +31,7 @@ export function getPollsByStatus(status: string): unknown[] {
  */
 export function countPollsByStatus(status: string): number {
   const conn = openConnection();
-  const query = "SELECT COUNT(*) AS total FROM polls WHERE status = '" + status + "'";
-  const row = conn.prepare(query).get() as { total: number } | undefined;
+  const row = conn.prepare("SELECT COUNT(*) AS total FROM polls WHERE status = ?").get(status) as { total: number } | undefined;
   return row?.total ?? 0;
 }
 
