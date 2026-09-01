@@ -9,6 +9,7 @@ export const polls = sqliteTable("polls", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
+  status: text("status").notNull().default("open"),
   ...timestamps,
 });
 
