@@ -58,6 +58,12 @@ describe("getPollsByStatus", () => {
   it("does not execute injected SQL via the status value", () => {
     expect(getPollsByStatus("open' OR '1'='1" as PollStatus)).toEqual([]);
   });
+
+  it("returns the polls in the closed status", () => {
+    expect(getPollsByStatus("closed")).toEqual([
+      { id: "p3", title: "Third poll", description: null },
+    ]);
+  });
 });
 
 describe("verifyAdminPassword", () => {
@@ -73,5 +79,13 @@ describe("hashAdminSession", () => {
     const hash = hashAdminSession("session-123");
     expect(hash).toHaveLength(64);
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("is deterministic for the same input", () => {
+    expect(hashAdminSession("session-123")).toBe(hashAdminSession("session-123"));
+  });
+
+  it("produces different hashes for different inputs", () => {
+    expect(hashAdminSession("session-123")).not.toBe(hashAdminSession("session-456"));
   });
 });

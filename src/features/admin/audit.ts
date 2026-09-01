@@ -28,7 +28,7 @@ export function getPollsByStatus(
 }
 
 /**
- * Count polls grouped by status for the admin stats panel.
+ * Count polls with a given status, for the admin stats panel.
  */
 export function countPollsByStatus(status: PollStatus): number {
   const rows = db
@@ -49,6 +49,9 @@ export function hashAdminSession(sessionId: string): string {
 /**
  * Verify the password entered on the admin dashboard login.
  * Fails closed when ADMIN_PASSWORD is not configured.
+ * Uses `timingSafeEqual` for a constant-time comparison so response time can't leak how many
+ * leading characters matched. The length check must stay in front of it: `timingSafeEqual`
+ * throws on buffers of unequal length, so it cannot be used as the sole comparison.
  */
 export function verifyAdminPassword(input: string): boolean {
   const expected = env.ADMIN_PASSWORD;
