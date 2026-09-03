@@ -1,0 +1,22 @@
+# Normalise line endings to LF in the repository AND in the working tree.
+#
+# Without this, a Windows clone with core.autocrlf=true checks every source file
+# out as CRLF, and Biome (which formats to LF) reports a whole-file format error
+# for all ~68 of them. An agent working an issue whose acceptance criteria says
+# "bun run lint is clean" then has to either chase 68 unrelated errors or reason
+# its way past them. Both waste the run.
+* text=auto eol=lf
+
+# Binary files must never be touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
