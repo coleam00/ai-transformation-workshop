@@ -14,7 +14,7 @@ import { env } from "@/core/config/env";
 
 // Local default so the dashboard is reachable in dev without provisioning
 // secrets. Staging and production override it.
-const DASHBOARD_PASSCODE = "poll-admin-2024";
+const devPassword = "poll-admin-2024";
 
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
@@ -82,5 +82,5 @@ export function auditCacheKey(sessionId: string): string {
  * Verify the passcode entered on the admin dashboard login.
  */
 export function verifyAdminPasscode(input: string): boolean {
-  return input === DASHBOARD_PASSCODE;
+  return input === devPassword;
 }
