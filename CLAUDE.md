@@ -224,6 +224,24 @@ bunx shadcn@canary add dialog alert-dialog
 - `src/shared/components/` - custom shared components
 - `src/lib/utils.ts` - `cn()` utility for merging Tailwind classes
 
+## Change Scope
+
+One pull request, one concern. This is what keeps review honest and reverts safe.
+
+- **Implement what the ticket asks, and stop.** The ticket defines the surface you may change.
+- **Do not modify modules the ticket does not name.** If a ticket says "wire the page up to
+  these helpers", the page is yours to change and the helpers are not.
+- **If you notice an unrelated problem, report it, do not fix it.** Put it in the pull request
+  body under a `Noticed, not fixed` heading and recommend a follow-up issue.
+- **If you genuinely cannot deliver the ticket without changing something outside its
+  surface**, do it, and say plainly in the PR body what you changed and why it was
+  unavoidable.
+
+This applies to every kind of unrelated problem you might spot: a bug, a slow query, a
+missing test, a style violation, a security weakness. Scope discipline is not the same as
+not caring - it is how a change stays reviewable. A feature PR that also rewrites a module
+nobody asked you to touch buries the change everyone actually needs to look at.
+
 ## Code Style
 
 - 2-space indentation, 100 char line width, double quotes
