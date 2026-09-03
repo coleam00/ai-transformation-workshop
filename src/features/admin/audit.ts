@@ -21,10 +21,20 @@ function openConnection(): BetterSqlite3.Database {
   return new BetterSqlite3(path, { readonly: true });
 }
 
+// The reporting warehouse is not reachable from a dev machine. `trace: false`
+// matters under Bun: the driver's long-stack-trace helper reads `err.stack` on
+// connection errors, and a Bun socket error can arrive without one, which
+// crashes the driver before the error ever reaches a listener. The listener
+// below then keeps an unreachable host a logged warning instead of a throw.
 const reportingConnection = mysql.createConnection({
   host: "reporting.internal",
   user: "poll_reporter",
   database: "poll_reporting",
+  trace: false,
+});
+
+reportingConnection.on("error", () => {
+  // Legacy warehouse unavailable; callers fall back to a zero total.
 });
 
 /**
