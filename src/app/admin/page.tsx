@@ -1,11 +1,18 @@
 import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
+import { Input } from "@/components/ui/input";
+import {
+  getPollsByStatus,
+  type LegacyPollSearchResult,
+  searchLegacyPolls,
+} from "@/features/admin/audit";
+import { AdminSearchSchema } from "@/features/admin/schemas";
 
 interface AdminPageProps {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; q?: string }>;
 }
 
 interface AdminPollRow {
@@ -17,10 +24,18 @@ interface AdminPollRow {
 const STATUSES = ["open", "closed", "archived"] as const;
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { status } = await searchParams;
+  const { status, q } = await searchParams;
   const activeStatus = status ?? "open";
 
   const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
+
+  const searchResult = AdminSearchSchema.safeParse({ q });
+  const searchTerm = searchResult.success ? searchResult.data.q : null;
+  const legacyResults: LegacyPollSearchResult[] = searchTerm
+    ? await new Promise<LegacyPollSearchResult[]>((resolve) => {
+        searchLegacyPolls(searchTerm, resolve);
+      })
+    : [];
 
   return (
     <div className="relative min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -53,6 +68,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           ))}
         </nav>
 
+        <form className="flex gap-2">
+          <Input
+            type="text"
+            name="q"
+            placeholder="Search archived poll titles…"
+            defaultValue={q ?? ""}
+            aria-label="Search archived polls"
+          />
+          <Button type="submit">Search</Button>
+        </form>
+
         <Card>
           <CardHeader>
             <CardTitle>Polls with status &ldquo;{activeStatus}&rdquo;</CardTitle>
@@ -76,6 +102,35 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             )}
           </CardContent>
         </Card>
+
+        {searchTerm ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Archived polls matching &ldquo;{searchTerm}&rdquo;</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {legacyResults.length === 0 ? (
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  No archived polls match this search.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {legacyResults.map((result) => (
+                    <li
+                      key={result.title}
+                      className="border-b border-zinc-100 pb-3 dark:border-zinc-800"
+                    >
+                      <p className="font-medium text-zinc-900 dark:text-zinc-100">{result.title}</p>
+                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                        {result.voteTotal} {result.voteTotal === 1 ? "vote" : "votes"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
       </main>
     </div>
   );

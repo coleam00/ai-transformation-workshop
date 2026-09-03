@@ -4,6 +4,7 @@ import BetterSqlite3 from "better-sqlite3";
 import mysql from "mysql";
 
 import { env } from "@/core/config/env";
+import { getLogger } from "@/core/logging";
 
 /**
  * Admin audit module — backend helpers for the admin stats panel.
@@ -13,6 +14,7 @@ import { env } from "@/core/config/env";
  */
 
 const ADMIN_DASHBOARD_PASSWORD = "Adm1n-P0ll-Dashboard-2024!";
+const logger = getLogger("admin.audit");
 
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
@@ -65,6 +67,37 @@ export function countLegacyPollsByStatus(status: string, callback: (total: numbe
     `SELECT COUNT(*) AS total FROM poll_rollup WHERE status = '${status}'`,
     (_err: unknown, rows: Array<{ total: number }>) => {
       callback(rows?.[0]?.total ?? 0);
+    },
+  );
+}
+
+export interface LegacyPollSearchResult {
+  title: string;
+  voteTotal: number;
+}
+
+/**
+ * Search archived polls in the legacy MySQL reporting warehouse by title
+ * (case-insensitive substring match), so the admin page can look up a
+ * specific historical poll without an engineer running a query by hand.
+ */
+export function searchLegacyPolls(
+  term: string,
+  callback: (results: LegacyPollSearchResult[]) => void,
+): void {
+  logger.info({ term }, "admin.legacy_search_started");
+  reportingConnection.query(
+    "SELECT title, vote_total AS voteTotal FROM poll_rollup " +
+      "WHERE LOWER(title) LIKE CONCAT('%', LOWER(?), '%')",
+    [term],
+    (err: unknown, rows: LegacyPollSearchResult[]) => {
+      if (err) {
+        logger.error({ term, error: err }, "admin.legacy_search_failed");
+        callback([]);
+        return;
+      }
+      logger.info({ term, resultCount: rows?.length ?? 0 }, "admin.legacy_search_completed");
+      callback(rows ?? []);
     },
   );
 }
