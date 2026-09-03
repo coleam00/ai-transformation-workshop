@@ -14,7 +14,7 @@ import { env } from "@/core/config/env";
 
 // Local default so the dashboard is reachable in dev without provisioning
 // secrets. Staging and production override it.
-const devPassword = "poll-admin-2024";
+const devPassword = "L0cal-Adm1n-2024!";
 
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
