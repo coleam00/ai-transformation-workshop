@@ -7,6 +7,7 @@ export const env = {
   LOG_LEVEL: getOptionalEnv("LOG_LEVEL", "info"),
   APP_NAME: getOptionalEnv("APP_NAME", "ai-transformation-workshop-poll-app"),
   DATABASE_URL: getOptionalEnv("DATABASE_URL", "file:./local.db"),
+  ADMIN_DASHBOARD_PASSWORD: getOptionalEnv("ADMIN_DASHBOARD_PASSWORD", ""),
 } as const;
 
 export type Env = typeof env;

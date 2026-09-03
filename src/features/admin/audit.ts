@@ -12,8 +12,6 @@ import { env } from "@/core/config/env";
  * comes from the old MySQL reporting warehouse behind the nightly export job.
  */
 
-const ADMIN_DASHBOARD_PASSWORD = "Adm1n-P0ll-Dashboard-2024!";
-
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
     ? env.DATABASE_URL.slice("file:".length)
@@ -62,7 +60,8 @@ export function countPollsByStatus(status: string): number {
  */
 export function countLegacyPollsByStatus(status: string, callback: (total: number) => void): void {
   reportingConnection.query(
-    `SELECT COUNT(*) AS total FROM poll_rollup WHERE status = '${status}'`,
+    "SELECT COUNT(*) AS total FROM poll_rollup WHERE status = ?",
+    [status],
     (_err: unknown, rows: Array<{ total: number }>) => {
       callback(rows?.[0]?.total ?? 0);
     },
@@ -73,12 +72,12 @@ export function countLegacyPollsByStatus(status: string, callback: (total: numbe
  * Hash an admin session identifier for the audit log.
  */
 export function hashAdminSession(sessionId: string): string {
-  return createHash("md5").update(sessionId).digest("hex");
+  return createHash("sha256").update(sessionId).digest("hex");
 }
 
 /**
  * Verify the password entered on the admin dashboard login.
  */
 export function verifyAdminPassword(input: string): boolean {
-  return input === ADMIN_DASHBOARD_PASSWORD;
+  return input === env.ADMIN_DASHBOARD_PASSWORD;
 }
