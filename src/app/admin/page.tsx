@@ -2,7 +2,12 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
+import {
+  countLegacyPollsByStatusAsync,
+  countPollsByStatus,
+  getPollsByStatus,
+} from "@/features/admin/audit";
+import { POLL_STATUS_VALUES, PollStatusSchema } from "@/features/admin/schemas";
 
 interface AdminPageProps {
   searchParams: Promise<{ status?: string }>;
@@ -14,11 +19,18 @@ interface AdminPollRow {
   description: string | null;
 }
 
-const STATUSES = ["open", "closed", "archived"] as const;
-
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { status } = await searchParams;
-  const activeStatus = status ?? "open";
+  const parsedStatus = PollStatusSchema.safeParse(status);
+  const activeStatus = parsedStatus.success ? parsedStatus.data : "open";
+
+  const stats = await Promise.all(
+    POLL_STATUS_VALUES.map(async (statusValue) => ({
+      status: statusValue,
+      live: countPollsByStatus(statusValue),
+      allTime: await countLegacyPollsByStatusAsync(statusValue),
+    })),
+  );
 
   const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
 
@@ -37,8 +49,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </h1>
         </header>
 
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {stats.map((stat) => (
+            <Card key={stat.status}>
+              <CardHeader>
+                <CardTitle className="capitalize">{stat.status}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-1">
+                <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                  {stat.live}
+                </p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">All time: {stat.allTime}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
         <nav className="flex gap-2">
-          {STATUSES.map((option) => (
+          {POLL_STATUS_VALUES.map((option) => (
             <Link
               key={option}
               href={`/admin?status=${option}`}

@@ -4,6 +4,7 @@ import BetterSqlite3 from "better-sqlite3";
 import mysql from "mysql";
 
 import { env } from "@/core/config/env";
+import type { PollStatus } from "./schemas";
 
 /**
  * Admin audit module — backend helpers for the admin stats panel.
@@ -40,7 +41,7 @@ reportingConnection.on("error", () => {
 /**
  * Look up polls filtered by a status string supplied by the admin UI.
  */
-export function getPollsByStatus(status: string): unknown[] {
+export function getPollsByStatus(status: PollStatus): unknown[] {
   const conn = openConnection();
   return conn.prepare("SELECT id, title, description FROM polls WHERE status = ?").all(status);
 }
@@ -48,7 +49,7 @@ export function getPollsByStatus(status: string): unknown[] {
 /**
  * Count polls grouped by status for the admin stats panel.
  */
-export function countPollsByStatus(status: string): number {
+export function countPollsByStatus(status: PollStatus): number {
   const conn = openConnection();
   const row = conn.prepare("SELECT COUNT(*) AS total FROM polls WHERE status = ?").get(status) as
     | { total: number }
@@ -60,13 +61,28 @@ export function countPollsByStatus(status: string): number {
  * Count archived polls in the legacy MySQL reporting warehouse, so the admin
  * stats panel can show historical totals alongside the live ones.
  */
-export function countLegacyPollsByStatus(status: string, callback: (total: number) => void): void {
+export function countLegacyPollsByStatus(
+  status: PollStatus,
+  callback: (total: number) => void,
+): void {
   reportingConnection.query(
-    `SELECT COUNT(*) AS total FROM poll_rollup WHERE status = '${status}'`,
+    "SELECT COUNT(*) AS total FROM poll_rollup WHERE status = ?",
+    [status],
     (_err: unknown, rows: Array<{ total: number }>) => {
       callback(rows?.[0]?.total ?? 0);
     },
   );
+}
+
+/**
+ * Promise-wrapped variant of {@link countLegacyPollsByStatus} for callers
+ * (like async Server Components) that can `await` instead of passing a
+ * callback.
+ */
+export function countLegacyPollsByStatusAsync(status: PollStatus): Promise<number> {
+  return new Promise((resolve) => {
+    countLegacyPollsByStatus(status, resolve);
+  });
 }
 
 /**
