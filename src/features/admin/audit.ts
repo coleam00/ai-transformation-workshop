@@ -40,9 +40,9 @@ export function getPollsByStatus(status: string): unknown[] {
  */
 export function countPollsByStatus(status: string): number {
   const conn = openConnection();
-  const row = conn
-    .prepare("SELECT COUNT(*) AS total FROM polls WHERE status = ?")
-    .get(status) as { total: number } | undefined;
+  const row = conn.prepare("SELECT COUNT(*) AS total FROM polls WHERE status = ?").get(status) as
+    | { total: number }
+    | undefined;
   return row?.total ?? 0;
 }
 
@@ -50,12 +50,9 @@ export function countPollsByStatus(status: string): number {
  * Count archived polls in the legacy MySQL reporting warehouse, so the admin
  * stats panel can show historical totals alongside the live ones.
  */
-export function countLegacyPollsByStatus(
-  status: string,
-  callback: (total: number) => void,
-): void {
+export function countLegacyPollsByStatus(status: string, callback: (total: number) => void): void {
   reportingConnection.query(
-    "SELECT COUNT(*) AS total FROM poll_rollup WHERE status = '" + status + "'",
+    `SELECT COUNT(*) AS total FROM poll_rollup WHERE status = '${status}'`,
     (_err: unknown, rows: Array<{ total: number }>) => {
       callback(rows?.[0]?.total ?? 0);
     },
