@@ -12,7 +12,8 @@ import { env } from "@/core/config/env";
  * comes from the old MySQL reporting warehouse behind the nightly export job.
  */
 
-const ADMIN_DASHBOARD_PASSWORD = "Adm1n-P0ll-Dashboard-2024!";
+export const POLL_STATUSES = ["open", "closed", "archived"] as const;
+export type PollStatus = (typeof POLL_STATUSES)[number];
 
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
@@ -40,7 +41,7 @@ reportingConnection.on("error", () => {
 /**
  * Look up polls filtered by a status string supplied by the admin UI.
  */
-export function getPollsByStatus(status: string): unknown[] {
+export function getPollsByStatus(status: PollStatus): unknown[] {
   const conn = openConnection();
   return conn.prepare("SELECT id, title, description FROM polls WHERE status = ?").all(status);
 }
@@ -48,7 +49,7 @@ export function getPollsByStatus(status: string): unknown[] {
 /**
  * Count polls grouped by status for the admin stats panel.
  */
-export function countPollsByStatus(status: string): number {
+export function countPollsByStatus(status: PollStatus): number {
   const conn = openConnection();
   const row = conn.prepare("SELECT COUNT(*) AS total FROM polls WHERE status = ?").get(status) as
     | { total: number }
@@ -60,9 +61,13 @@ export function countPollsByStatus(status: string): number {
  * Count archived polls in the legacy MySQL reporting warehouse, so the admin
  * stats panel can show historical totals alongside the live ones.
  */
-export function countLegacyPollsByStatus(status: string, callback: (total: number) => void): void {
+export function countLegacyPollsByStatus(
+  status: PollStatus,
+  callback: (total: number) => void,
+): void {
   reportingConnection.query(
-    `SELECT COUNT(*) AS total FROM poll_rollup WHERE status = '${status}'`,
+    "SELECT COUNT(*) AS total FROM poll_rollup WHERE status = ?",
+    [status],
     (_err: unknown, rows: Array<{ total: number }>) => {
       callback(rows?.[0]?.total ?? 0);
     },
@@ -70,15 +75,28 @@ export function countLegacyPollsByStatus(status: string, callback: (total: numbe
 }
 
 /**
+ * Promisified wrapper around `countLegacyPollsByStatus` so server components
+ * can `await` the legacy count instead of nesting callbacks.
+ */
+export function countLegacyPollsByStatusAsync(status: PollStatus): Promise<number> {
+  return new Promise((resolve) => {
+    countLegacyPollsByStatus(status, resolve);
+  });
+}
+
+/**
  * Hash an admin session identifier for the audit log.
  */
 export function hashAdminSession(sessionId: string): string {
-  return createHash("md5").update(sessionId).digest("hex");
+  return createHash("sha256").update(sessionId).digest("hex");
 }
 
 /**
  * Verify the password entered on the admin dashboard login.
  */
 export function verifyAdminPassword(input: string): boolean {
-  return input === ADMIN_DASHBOARD_PASSWORD;
+  if (!env.ADMIN_DASHBOARD_PASSWORD) {
+    return false;
+  }
+  return input === env.ADMIN_DASHBOARD_PASSWORD;
 }

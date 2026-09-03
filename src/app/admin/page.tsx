@@ -2,7 +2,13 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
+import {
+  countLegacyPollsByStatusAsync,
+  countPollsByStatus,
+  getPollsByStatus,
+  POLL_STATUSES,
+  type PollStatus,
+} from "@/features/admin/audit";
 
 interface AdminPageProps {
   searchParams: Promise<{ status?: string }>;
@@ -14,13 +20,23 @@ interface AdminPollRow {
   description: string | null;
 }
 
-const STATUSES = ["open", "closed", "archived"] as const;
+function isPollStatus(value: string): value is PollStatus {
+  return (POLL_STATUSES as readonly string[]).includes(value);
+}
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { status } = await searchParams;
-  const activeStatus = status ?? "open";
+  const activeStatus: PollStatus = status && isPollStatus(status) ? status : "open";
 
   const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
+
+  const statusStats = await Promise.all(
+    POLL_STATUSES.map(async (s) => ({
+      status: s,
+      live: countPollsByStatus(s),
+      allTime: await countLegacyPollsByStatusAsync(s),
+    })),
+  );
 
   return (
     <div className="relative min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -37,8 +53,26 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </h1>
         </header>
 
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {statusStats.map((stat) => (
+            <Card key={stat.status}>
+              <CardHeader>
+                <CardTitle className="capitalize">{stat.status}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-baseline gap-2">
+                <span className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
+                  {stat.live}
+                </span>
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                  / {stat.allTime} all time
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
         <nav className="flex gap-2">
-          {STATUSES.map((option) => (
+          {POLL_STATUSES.map((option) => (
             <Link
               key={option}
               href={`/admin?status=${option}`}
