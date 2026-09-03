@@ -12,9 +12,9 @@ import { env } from "@/core/config/env";
  * comes from the old MySQL reporting warehouse behind the nightly export job.
  */
 
-// Falls back to the shared local value so the dashboard is reachable in dev
-// without provisioning secrets.
-const DASHBOARD_PASSCODE = process.env["ADMIN_PASSCODE"] ?? "poll-admin-2024";
+// Local default so the dashboard is reachable in dev without provisioning
+// secrets. Staging and production override it.
+const DASHBOARD_PASSCODE = "poll-admin-2024";
 
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
