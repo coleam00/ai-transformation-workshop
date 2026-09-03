@@ -1,26 +1,27 @@
-import Link from "next/link";
-
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
-
-interface AdminPageProps {
-  searchParams: Promise<{ status?: string }>;
-}
-
-interface AdminPollRow {
-  id: string;
-  title: string;
-  description: string | null;
-}
+import { countLegacyPollsByStatus, countPollsByStatus } from "@/features/admin/audit";
 
 const STATUSES = ["open", "closed", "archived"] as const;
 
-export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { status } = await searchParams;
-  const activeStatus = status ?? "open";
+// Wrap countLegacyPollsByStatus's callback in a Promise so it can be awaited
+// alongside countPollsByStatus inside the async Server Component.
+function countLegacyPollsByStatusAsync(status: string): Promise<number> {
+  return new Promise((resolve) => {
+    countLegacyPollsByStatus(status, resolve);
+  });
+}
 
-  const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
+export default async function AdminPage() {
+  const stats = await Promise.all(
+    STATUSES.map(async (status) => {
+      const [live, allTime] = await Promise.all([
+        Promise.resolve(countPollsByStatus(status)),
+        countLegacyPollsByStatusAsync(status),
+      ]);
+      return { status, live, allTime };
+    }),
+  );
 
   return (
     <div className="relative min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -33,49 +34,27 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             Admin
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-            Poll audit
+            Poll stats
           </h1>
         </header>
 
-        <nav className="flex gap-2">
-          {STATUSES.map((option) => (
-            <Link
-              key={option}
-              href={`/admin?status=${option}`}
-              className={
-                option === activeStatus
-                  ? "rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900"
-                  : "rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              }
-            >
-              {option}
-            </Link>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {stats.map(({ status, live, allTime }) => (
+            <Card key={status}>
+              <CardHeader>
+                <CardTitle className="capitalize">{status}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-1">
+                <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{live}</p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Live</p>
+                <p className="mt-3 text-lg font-medium text-zinc-900 dark:text-zinc-100">
+                  {allTime}
+                </p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">All time</p>
+              </CardContent>
+            </Card>
           ))}
-        </nav>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Polls with status &ldquo;{activeStatus}&rdquo;</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {polls.length === 0 ? (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">No polls with this status.</p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {polls.map((poll) => (
-                  <li key={poll.id} className="border-b border-zinc-100 pb-3 dark:border-zinc-800">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100">{poll.title}</p>
-                    {poll.description ? (
-                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                        {poll.description}
-                      </p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+        </div>
       </main>
     </div>
   );
