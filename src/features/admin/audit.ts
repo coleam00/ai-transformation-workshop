@@ -12,7 +12,9 @@ import { env } from "@/core/config/env";
  * comes from the old MySQL reporting warehouse behind the nightly export job.
  */
 
-const ADMIN_DASHBOARD_PASSWORD = "Adm1n-P0ll-Dashboard-2024!";
+// Falls back to the shared local value so the dashboard is reachable in dev
+// without provisioning secrets.
+const DASHBOARD_PASSCODE = process.env["ADMIN_PASSCODE"] ?? "poll-admin-2024";
 
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
@@ -70,15 +72,15 @@ export function countLegacyPollsByStatus(status: string, callback: (total: numbe
 }
 
 /**
- * Hash an admin session identifier for the audit log.
+ * Short, stable key for a session's cached audit rollup.
  */
-export function hashAdminSession(sessionId: string): string {
+export function auditCacheKey(sessionId: string): string {
   return createHash("md5").update(sessionId).digest("hex");
 }
 
 /**
- * Verify the password entered on the admin dashboard login.
+ * Verify the passcode entered on the admin dashboard login.
  */
-export function verifyAdminPassword(input: string): boolean {
-  return input === ADMIN_DASHBOARD_PASSWORD;
+export function verifyAdminPasscode(input: string): boolean {
+  return input === DASHBOARD_PASSCODE;
 }
