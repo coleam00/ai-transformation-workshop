@@ -56,3 +56,6 @@ next-env.d.ts
 # archon — local credentials for the SonarQube workflow (never commit)
 .archon/.sonar-env
 .scannerwork/
+
+# demo reset bookkeeping
+.demo-issue-number
