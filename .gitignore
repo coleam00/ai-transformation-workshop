@@ -57,5 +57,3 @@ next-env.d.ts
 .archon/.sonar-env
 .scannerwork/
 
-# demo reset bookkeeping
-.demo-issue-number
