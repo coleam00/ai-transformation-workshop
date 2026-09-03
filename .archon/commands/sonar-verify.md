@@ -24,6 +24,7 @@ Workflow artifacts directory: $ARTIFACTS_DIR
 ## Context you need
 
 - **Project key & organization**: read them from `sonar-project.properties` in the repo root.
+  For this repo that is `coleam00_archon-secure-demo` in organization `coleam00`.
 - **Branch**: all scans and gate checks target the `main` branch on SonarQube Cloud.
 - **Token**: `SONAR_TOKEN` is already exported in the environment for `sonar-scanner`.
 
@@ -50,6 +51,9 @@ Gather the specific problems that fail the gate:
 - `mcp__sonarqube__search_security_hotspots` — security hotspots on this project/branch.
 - `mcp__sonarqube__search_sonar_issues_in_projects` — issues (bugs, vulnerabilities, code smells).
 - `mcp__sonarqube__search_dependency_risks` — SCA / malicious-package / license risks (if Advanced Security is enabled).
+
+Only the **quality gate status** decides whether this node passes. Issues that do not
+fail the gate are worth reporting but must not send you into another remediation cycle.
 - For any rule you are unsure about, call `mcp__sonarqube__show_rule` to read the rule
   documentation and the recommended remediation.
 
@@ -68,11 +72,12 @@ a real finding.
 After fixing, re-submit the analysis:
 
 ```bash
-export PATH="$HOME/AppData/Roaming/npm:$PATH"
+export PATH="$HOME/AppData/Roaming/npm:$HOME/.local/bin:$PATH"
 sonar-scanner -Dsonar.token="$SONAR_TOKEN" -Dsonar.branch.name=main
 ```
 
-Then return to Step 1. (If `sonar-scanner` is not found, it is installed at
+Wait for the scanner to print `ANALYSIS SUCCESSFUL` before moving on, then return
+to Step 1. (If `sonar-scanner` is not found, it is installed at
 `$HOME/AppData/Roaming/npm/sonar-scanner`.)
 
 ### Cycle limit
