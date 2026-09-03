@@ -52,8 +52,20 @@ Gather the specific problems that fail the gate:
 - `mcp__sonarqube__search_sonar_issues_in_projects` — issues (bugs, vulnerabilities, code smells).
 - `mcp__sonarqube__search_dependency_risks` — SCA / malicious-package / license risks (if Advanced Security is enabled).
 
-Only the **quality gate status** decides whether this node passes. Issues that do not
-fail the gate are worth reporting but must not send you into another remediation cycle.
+### Scope boundary (strict)
+
+Only the **quality gate status** decides whether this node passes.
+
+- Fix **only** the findings that are failing the gate. Nothing else.
+- Do **not** refactor, restructure, or "harden while you are in there". No new features,
+  no new modules, no rate limiting, no schema or migration changes, no dependency changes,
+  no test scaffolding beyond what a gate finding requires.
+- Prefer the **smallest edit that clears the finding**. Parameterizing a query is in scope.
+  Rewriting the module onto a different database client is not.
+- Issues that do not fail the gate are worth **reporting** in your summary, but must not be
+  fixed here and must not send you into another remediation cycle.
+- If `sonar-project.properties` looks wrong, **report it and stop** rather than editing it.
+  A gate node that edits its own gate configuration is not a gate.
 - For any rule you are unsure about, call `mcp__sonarqube__show_rule` to read the rule
   documentation and the recommended remediation.
 
