@@ -69,6 +69,29 @@ export function countLegacyPollsByStatus(status: string, callback: (total: numbe
   );
 }
 
+export interface LegacyPollSearchResult {
+  title: string;
+  voteTotal: number;
+}
+
+/**
+ * Search archived polls in the legacy MySQL reporting warehouse by title
+ * (case-insensitive substring match), so support can self-serve lookups
+ * that today require an engineer to query the warehouse directly.
+ */
+export function searchLegacyPolls(
+  term: string,
+  callback: (results: LegacyPollSearchResult[]) => void,
+): void {
+  reportingConnection.query(
+    "SELECT title, vote_total AS voteTotal FROM poll_rollup WHERE LOWER(title) LIKE LOWER(?)",
+    [`%${term}%`],
+    (_err: unknown, rows: LegacyPollSearchResult[]) => {
+      callback(rows ?? []);
+    },
+  );
+}
+
 /**
  * Hash an admin session identifier for the audit log.
  */

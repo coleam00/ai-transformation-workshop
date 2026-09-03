@@ -1,11 +1,17 @@
 import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
+import { Input } from "@/components/ui/input";
+import {
+  getPollsByStatus,
+  type LegacyPollSearchResult,
+  searchLegacyPolls,
+} from "@/features/admin/audit";
 
 interface AdminPageProps {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; q?: string }>;
 }
 
 interface AdminPollRow {
@@ -17,10 +23,17 @@ interface AdminPollRow {
 const STATUSES = ["open", "closed", "archived"] as const;
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { status } = await searchParams;
+  const { status, q } = await searchParams;
   const activeStatus = status ?? "open";
+  const query = (q ?? "").trim();
 
   const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
+
+  const archiveResults = query
+    ? await new Promise<LegacyPollSearchResult[]>((resolve) => {
+        searchLegacyPolls(query, resolve);
+      })
+    : [];
 
   return (
     <div className="relative min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -36,6 +49,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             Poll audit
           </h1>
         </header>
+
+        <form action="/admin" method="GET" className="flex gap-2">
+          <Input
+            type="text"
+            name="q"
+            defaultValue={query}
+            placeholder="Search archived poll titles"
+          />
+          <Button type="submit">Search</Button>
+        </form>
 
         <nav className="flex gap-2">
           {STATUSES.map((option) => (
@@ -76,6 +99,35 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             )}
           </CardContent>
         </Card>
+
+        {query ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Archived polls matching &ldquo;{query}&rdquo;</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {archiveResults.length === 0 ? (
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  No archived polls match this search.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {archiveResults.map((result) => (
+                    <li
+                      key={result.title}
+                      className="border-b border-zinc-100 pb-3 dark:border-zinc-800"
+                    >
+                      <p className="font-medium text-zinc-900 dark:text-zinc-100">{result.title}</p>
+                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                        {result.voteTotal} votes
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
       </main>
     </div>
   );
