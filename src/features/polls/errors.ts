@@ -1,8 +1,8 @@
 export class PollError extends Error {
   public readonly code: string;
-  public readonly statusCode: 400 | 401 | 403 | 404 | 409 | 500;
+  public readonly statusCode: 400 | 401 | 403 | 404 | 409 | 429 | 500;
 
-  constructor(message: string, code: string, statusCode: 400 | 401 | 403 | 404 | 409 | 500) {
+  constructor(message: string, code: string, statusCode: 400 | 401 | 403 | 404 | 409 | 429 | 500) {
     super(message);
     this.name = "PollError";
     this.code = code;
@@ -31,5 +31,11 @@ export class PollOptionMismatchError extends PollError {
 export class DuplicateVoteError extends PollError {
   constructor() {
     super("You have already voted on this poll", "POLL_DUPLICATE_VOTE", 409);
+  }
+}
+
+export class PollRateLimitError extends PollError {
+  constructor(message: string) {
+    super(message, "POLL_RATE_LIMITED", 429);
   }
 }

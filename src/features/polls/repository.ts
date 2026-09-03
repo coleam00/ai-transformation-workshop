@@ -60,6 +60,21 @@ export function findVoteByToken(pollId: string, voterToken: string): Vote | unde
     .all()[0];
 }
 
+/**
+ * True when `error` is a SQLite unique-constraint violation, i.e. the
+ * `votes_poll_voter_unique` index rejected a duplicate (pollId, voterToken)
+ * insert. This is the authoritative duplicate-vote check: it's atomic at the
+ * database layer, so it can't be raced the way a prior check-then-insert
+ * (findVoteByToken, then recordVote) could be by concurrent requests.
+ */
+export function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE"
+  );
+}
+
 export function recordVote(pollId: string, optionId: string, voterToken: string): Vote {
   const id = randomUUID();
   const inserted = db.insert(votes).values({ id, pollId, optionId, voterToken }).returning().all();

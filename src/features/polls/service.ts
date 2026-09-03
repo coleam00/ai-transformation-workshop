@@ -47,13 +47,25 @@ export function castVote(input: CastVoteInput): { recorded: boolean; alreadyVote
     throw new PollOptionMismatchError();
   }
 
+  // Fast-path check for a friendly early error; the database's unique index on
+  // (pollId, voterToken) is the actual source of truth below, since this check
+  // and the insert are not atomic and concurrent requests could otherwise both
+  // pass it (a TOCTOU race enabling duplicate votes in multi-worker deployments).
   const existing = repository.findVoteByToken(input.pollId, input.voterToken);
   if (existing) {
     logger.info({ pollId: input.pollId }, "poll.vote_duplicate");
     throw new DuplicateVoteError();
   }
 
-  repository.recordVote(input.pollId, input.optionId, input.voterToken);
+  try {
+    repository.recordVote(input.pollId, input.optionId, input.voterToken);
+  } catch (error) {
+    if (repository.isUniqueConstraintError(error)) {
+      logger.info({ pollId: input.pollId }, "poll.vote_duplicate");
+      throw new DuplicateVoteError();
+    }
+    throw error;
+  }
   logger.info({ pollId: input.pollId }, "poll.vote_completed");
   return { recorded: true, alreadyVoted: false };
 }

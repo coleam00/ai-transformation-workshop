@@ -4,11 +4,19 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getLogger } from "@/core/logging";
+import { checkRateLimit, getClientIp } from "@/core/rate-limit";
 import { getOrCreateVoterToken } from "@/features/polls/voter-token";
 import { CastVoteSchema, CreatePollSchema } from "./schemas";
 import { castVote as castVoteService, createPoll as createPollService } from "./service";
 
 const logger = getLogger("polls.actions");
+
+// Anonymous, cookie-based actions have no real identity to authorize against,
+// so limits are enforced per client IP — a barrier that isn't defeated by
+// simply clearing cookies to obtain a fresh voter token.
+const CREATE_POLL_LIMIT = 5;
+const CAST_VOTE_LIMIT = 30;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 export type CreatePollState = {
   status: "idle" | "error";
@@ -24,6 +32,11 @@ export async function createPollAction(
   const description = String(formData.get("description") ?? "");
   const optionsRaw = formData.getAll("options").map((value) => String(value));
   const options = optionsRaw.map((value) => value.trim()).filter((value) => value.length > 0);
+
+  const ip = await getClientIp();
+  if (!checkRateLimit(`poll:create:${ip}`, CREATE_POLL_LIMIT, RATE_LIMIT_WINDOW_MS)) {
+    return { status: "error", error: "Too many polls created. Please try again later." };
+  }
 
   const parsed = CreatePollSchema.safeParse({
     title,
@@ -76,6 +89,11 @@ export async function castVoteAction(
 
   if (!pollId || !optionId) {
     return { status: "error", error: "Please choose an option before voting" };
+  }
+
+  const ip = await getClientIp();
+  if (!checkRateLimit(`poll:vote:${ip}`, CAST_VOTE_LIMIT, RATE_LIMIT_WINDOW_MS)) {
+    return { status: "error", error: "Too many votes. Please try again later." };
   }
 
   const voterToken = await getOrCreateVoterToken();
