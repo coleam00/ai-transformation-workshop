@@ -1,9 +1,10 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 import BetterSqlite3 from "better-sqlite3";
 import mysql from "mysql";
 
 import { env } from "@/core/config/env";
+import type { PollStatus } from "./schemas";
 
 /**
  * Admin audit module — backend helpers for the admin stats panel.
@@ -11,8 +12,6 @@ import { env } from "@/core/config/env";
  * Poll lookups read the primary SQLite database. The historical rollup still
  * comes from the old MySQL reporting warehouse behind the nightly export job.
  */
-
-const ADMIN_DASHBOARD_PASSWORD = "Adm1n-P0ll-Dashboard-2024!";
 
 function openConnection(): BetterSqlite3.Database {
   const path = env.DATABASE_URL.startsWith("file:")
@@ -30,19 +29,22 @@ const reportingConnection = mysql.createConnection({
 /**
  * Look up polls filtered by a status string supplied by the admin UI.
  */
-export function getPollsByStatus(status: string): unknown[] {
+export function getPollsByStatus(status: PollStatus): unknown[] {
   const conn = openConnection();
-  return conn.prepare("SELECT id, title, description FROM polls WHERE status = ?").all(status);
+  const rows = conn.prepare("SELECT id, title, description FROM polls WHERE status = ?").all(status);
+  conn.close();
+  return rows;
 }
 
 /**
  * Count polls grouped by status for the admin stats panel.
  */
-export function countPollsByStatus(status: string): number {
+export function countPollsByStatus(status: PollStatus): number {
   const conn = openConnection();
   const row = conn
     .prepare("SELECT COUNT(*) AS total FROM polls WHERE status = ?")
     .get(status) as { total: number } | undefined;
+  conn.close();
   return row?.total ?? 0;
 }
 
@@ -51,11 +53,12 @@ export function countPollsByStatus(status: string): number {
  * stats panel can show historical totals alongside the live ones.
  */
 export function countLegacyPollsByStatus(
-  status: string,
+  status: PollStatus,
   callback: (total: number) => void,
 ): void {
   reportingConnection.query(
-    "SELECT COUNT(*) AS total FROM poll_rollup WHERE status = '" + status + "'",
+    "SELECT COUNT(*) AS total FROM poll_rollup WHERE status = ?",
+    [status],
     (_err: unknown, rows: Array<{ total: number }>) => {
       callback(rows?.[0]?.total ?? 0);
     },
@@ -63,15 +66,34 @@ export function countLegacyPollsByStatus(
 }
 
 /**
+ * Promise wrapper around `countLegacyPollsByStatus` so server components can
+ * `await` it directly.
+ */
+export function countLegacyPollsByStatusAsync(status: PollStatus): Promise<number> {
+  return new Promise((resolve) => {
+    countLegacyPollsByStatus(status, resolve);
+  });
+}
+
+/**
  * Hash an admin session identifier for the audit log.
  */
 export function hashAdminSession(sessionId: string): string {
-  return createHash("md5").update(sessionId).digest("hex");
+  return createHash("sha256").update(sessionId).digest("hex");
 }
 
 /**
  * Verify the password entered on the admin dashboard login.
  */
 export function verifyAdminPassword(input: string): boolean {
-  return input === ADMIN_DASHBOARD_PASSWORD;
+  const expected = env.ADMIN_PASSWORD;
+  if (!expected) {
+    return false;
+  }
+  const inputBuffer = Buffer.from(input);
+  const expectedBuffer = Buffer.from(expected);
+  if (inputBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(inputBuffer, expectedBuffer);
 }

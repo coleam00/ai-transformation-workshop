@@ -2,7 +2,12 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
+import {
+  countLegacyPollsByStatusAsync,
+  countPollsByStatus,
+  getPollsByStatus,
+} from "@/features/admin/audit";
+import { parsePollStatus, POLL_STATUSES } from "@/features/admin/schemas";
 
 interface AdminPageProps {
   searchParams: Promise<{ status?: string }>;
@@ -18,9 +23,17 @@ const STATUSES = ["open", "closed", "archived"] as const;
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { status } = await searchParams;
-  const activeStatus = status ?? "open";
+  const activeStatus = parsePollStatus(status);
 
   const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
+
+  const stats = await Promise.all(
+    POLL_STATUSES.map(async (pollStatus) => ({
+      status: pollStatus,
+      live: countPollsByStatus(pollStatus),
+      allTime: await countLegacyPollsByStatusAsync(pollStatus),
+    })),
+  );
 
   return (
     <div className="relative min-h-screen bg-zinc-50 font-sans dark:bg-zinc-950">
@@ -52,6 +65,30 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             </Link>
           ))}
         </nav>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {stats.map((stat) => (
+            <Card key={stat.status}>
+              <CardHeader>
+                <CardTitle className="capitalize">{stat.status}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-baseline gap-4">
+                <div>
+                  <p className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
+                    {stat.live}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Live</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
+                    {stat.allTime}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">All time</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
         <Card>
           <CardHeader>
