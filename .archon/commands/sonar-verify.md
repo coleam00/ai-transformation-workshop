@@ -56,7 +56,8 @@ Gather the specific problems that fail the gate:
 
 Only the **quality gate status** decides whether this node passes.
 
-- Fix **only** the findings that are failing the gate. Nothing else.
+- Fix **only** the findings that are failing the gate, plus any **dependency risk this
+  change introduced** (see below). Nothing else.
 - Do **not** refactor, restructure, or "harden while you are in there". No new features,
   no new modules, no rate limiting, no schema or migration changes, no dependency changes,
   no test scaffolding beyond what a gate finding requires.
@@ -78,6 +79,21 @@ rule documentation recommends — for example:
 - Weak hashing (MD5/SHA-1) → use a strong algorithm appropriate to the use case.
 Fix the root cause. Do not suppress, mark false-positive, or `// NOSONAR` your way past
 a real finding.
+
+### Step 4b — Dependency risk introduced by this change
+
+A downstream step will fail the run if this change increased the project's count of at-risk
+dependencies, so treat that as blocking too.
+
+- Call `mcp__sonarqube__search_dependency_risks` and look for releases marked
+  `newlyIntroduced`, or compare against `$ARTIFACTS_DIR/dep-baseline.json`.
+- A direct dependency you added is the obvious suspect, but the risk is usually a
+  **transitive** one - a package pulled in by the package you added. Read the lockfile to
+  find which of your new dependencies brings it in.
+- Fix it by upgrading the offending package, pinning a patched version through a
+  `package.json` override/resolution, or choosing a different library that does not carry
+  it. Re-run the install so the lockfile reflects the change, then re-scan.
+- Do not remove the feature to make the number go down.
 
 ### Step 5 — Re-scan
 

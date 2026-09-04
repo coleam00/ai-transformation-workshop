@@ -5,10 +5,11 @@ description: |
   Triggers: "securely fix issue #123", "fix and security-scan", "secure fix".
   NOT for: Plain issue fixes with no security gate (use poll-app-fix-issue).
 
-  This is poll-app-fix-issue plus a verification gate. The diff is three things:
+  This is poll-app-fix-issue plus a verification gate. The diff is four things:
   1. a bash node that runs the SonarQube scan  (no AI in it, so it always runs)
   2. an MCP node that reads the quality gate and remediates what fails
-  3. one dependency edge: create-pr depends on sonar-verify, not implement
+  3. a bash node that re-checks the result from the outside (no AI in it either)
+  4. one dependency edge: create-pr depends on verify-gate, not implement
 
   Full sequence:
   1. Fetch the issue named in the run message
@@ -120,7 +121,7 @@ nodes:
     context: fresh
 
   # ═══════════════════════════════════════════════════════════════
-  # ADDITION 1 of 3: THE SCAN
+  # ADDITION 1 of 4: THE SCAN
   # A bash node. There is no model in it, so it cannot decide to skip itself.
   # ═══════════════════════════════════════════════════════════════
 
@@ -137,6 +138,11 @@ nodes:
         echo "ERROR: sonar-scanner is not on PATH." >&2
         exit 1
       fi
+
+      # Record what the project already carried BEFORE publishing this analysis,
+      # so the guard downstream can tell "already there" from "this change added it".
+      python tools/dependency-risk-guard.py snapshot "$ARTIFACTS_DIR/dep-baseline.json"
+
       sonar-scanner \
         -Dsonar.token="$SONAR_TOKEN" \
         -Dsonar.branch.name=main
@@ -145,7 +151,7 @@ nodes:
     timeout: 900000
 
   # ═══════════════════════════════════════════════════════════════
-  # ADDITION 2 of 3: THE GATE
+  # ADDITION 2 of 4: THE REMEDIATION
   # Reads the quality gate over MCP, fixes what fails, re-scans. Max 3 cycles.
   # ═══════════════════════════════════════════════════════════════
 
@@ -157,12 +163,32 @@ nodes:
     timeout: 1800000
 
   # ═══════════════════════════════════════════════════════════════
+  # ADDITION 3 of 4: THE ASSERTION
+  #
+  # sonar-verify is an AI node. Depending on it means depending on a model's own
+  # report that it succeeded, which is the exact thing this workflow argues
+  # against. This node re-checks both claims from the outside: the gate is green,
+  # and the change added no new dependency risk. No model in it.
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: verify-gate
+    bash: |
+      set -uo pipefail
+      export PATH="$HOME/AppData/Roaming/npm:$HOME/.local/bin:$PATH"
+      echo "=== Verifying the result independently of the agent's own report ==="
+      python tools/quality-gate-guard.py main || exit 1
+      python tools/dependency-risk-guard.py check "$ARTIFACTS_DIR/dep-baseline.json" || exit 1
+      echo "=== Both checks passed ==="
+    depends_on: [sonar-verify]
+    timeout: 900000
+
+  # ═══════════════════════════════════════════════════════════════
   # PHASE 6: CREATE DRAFT PR
   #
-  # ADDITION 3 of 3 is the single line below: `depends_on: [sonar-verify]`.
+  # ADDITION 4 of 4 is the single line below: `depends_on: [verify-gate]`.
   # In poll-app-fix-issue this reads `depends_on: [implement]`. That edge is
   # the entire argument of this workflow: the PR cannot be reached except
-  # through the gate.
+  # through a step with no model in it.
   # ═══════════════════════════════════════════════════════════════
 
   - id: create-pr
@@ -193,7 +219,7 @@ nodes:
       7. Capture PR identifiers:
          PR_NUMBER=$(gh pr view --json number -q '.number'); echo "$PR_NUMBER" > "$ARTIFACTS_DIR/.pr-number"
          PR_URL=$(gh pr view --json url -q '.url'); echo "$PR_URL" > "$ARTIFACTS_DIR/.pr-url"
-    depends_on: [sonar-verify]
+    depends_on: [verify-gate]
     context: fresh
 
   # ═══════════════════════════════════════════════════════════════
