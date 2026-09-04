@@ -1,7 +1,9 @@
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getResults, hasVoted, PollNotFoundError, type PollResults } from "@/features/polls";
 import { getVoterToken } from "@/features/polls/voter-token";
@@ -79,6 +81,13 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
             </ul>
           </CardContent>
         </Card>
+
+        <Button asChild variant="outline" className="self-center">
+          <a href={`/api/polls/${results.poll.id}/export`} download>
+            <Download className="h-4 w-4" />
+            Export results
+          </a>
+        </Button>
 
         {!userVoted ? (
           <p className="text-center text-sm">
