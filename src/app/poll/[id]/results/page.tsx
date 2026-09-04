@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getResults, hasVoted, PollNotFoundError, type PollResults } from "@/features/polls";
 import { getVoterToken } from "@/features/polls/voter-token";
@@ -48,6 +49,9 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
             <p className="pt-2 text-sm text-zinc-500 dark:text-zinc-400">
               {results.totalVotes} {results.totalVotes === 1 ? "vote" : "votes"} so far
             </p>
+            <Button asChild variant="outline" size="sm" className="self-start">
+              <a href={`/api/polls/${results.poll.id}/export`}>Export results</a>
+            </Button>
           </CardHeader>
           <CardContent>
             <ul className="flex flex-col gap-4">

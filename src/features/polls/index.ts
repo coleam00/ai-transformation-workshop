@@ -22,6 +22,7 @@ export { CastVoteSchema, CreatePollSchema } from "./schemas";
 export {
   castVote,
   createPoll,
+  exportResults,
   getPollWithOptions,
   getResults,
   hasVoted,

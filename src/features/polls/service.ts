@@ -1,4 +1,5 @@
 import { getLogger } from "@/core/logging";
+import { toSafeFilename } from "@/shared/utils/filenames";
 
 import {
   DuplicateVoteError,
@@ -6,6 +7,7 @@ import {
   PollOptionMismatchError,
   PollOptionNotFoundError,
 } from "./errors";
+import { buildResultsWorkbookBuffer } from "./export";
 import type { Poll, PollResults, PollWithOptions } from "./models";
 import * as repository from "./repository";
 import type { CastVoteInput, CreatePollInput } from "./schemas";
@@ -66,6 +68,15 @@ export function getResults(pollId: string): PollResults {
   const options = repository.aggregateResults(pollId);
   const totalVotes = options.reduce((sum, option) => sum + option.voteCount, 0);
   return { poll, options, totalVotes };
+}
+
+export async function exportResults(pollId: string): Promise<{ buffer: Buffer; filename: string }> {
+  logger.info({ pollId }, "poll.export_started");
+  const results = getResults(pollId); // throws PollNotFoundError for a bad id
+  const buffer = await buildResultsWorkbookBuffer(results);
+  const filename = toSafeFilename(results.poll.title, "xlsx");
+  logger.info({ pollId }, "poll.export_completed");
+  return { buffer, filename };
 }
 
 export function listRecentPolls(limit = 10): Poll[] {
