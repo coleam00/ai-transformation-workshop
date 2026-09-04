@@ -30,6 +30,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.1",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.562.0",
     "mysql": "^2.18.1",
     "next": "16.1.0",
