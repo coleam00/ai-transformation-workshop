@@ -82,18 +82,37 @@ a real finding.
 
 ### Step 4b — Dependency risk introduced by this change
 
-A downstream step will fail the run if this change increased the project's count of at-risk
-dependencies, so treat that as blocking too.
+A downstream step fails the run if this change increased the project's count of at-risk
+dependencies, so this is blocking. Check it explicitly:
 
-- Call `mcp__sonarqube__search_dependency_risks` and look for releases marked
-  `newlyIntroduced`, or compare against `$ARTIFACTS_DIR/dep-baseline.json`.
-- A direct dependency you added is the obvious suspect, but the risk is usually a
-  **transitive** one - a package pulled in by the package you added. Read the lockfile to
-  find which of your new dependencies brings it in.
-- Fix it by upgrading the offending package, pinning a patched version through a
-  `package.json` override/resolution, or choosing a different library that does not carry
-  it. Re-run the install so the lockfile reflects the change, then re-scan.
-- Do not remove the feature to make the number go down.
+```bash
+python tools/dependency-risk-guard.py check "$ARTIFACTS_DIR/dep-baseline.json"
+```
+
+Exit 0 means clear. Non-zero means **this change added dependency risk and you must fix it**.
+
+> **Do not rely on the `newlyIntroduced` flag from `search_dependency_risks` here.** That
+> flag is only computed for a branch measured against the project's main branch. This
+> workflow publishes its analysis *as* `main`, so there is nothing to compare against and
+> the flag reads `false` for everything, including packages this change just added. The
+> guard above compares against a baseline captured before the analysis was published, which
+> is why it is the thing that decides.
+
+To find *which* package, when the guard fails:
+
+1. `git diff origin/main -- bun.lock package.json` shows every package this change added,
+   direct and transitive.
+2. Call `mcp__sonarqube__search_dependency_risks` for the full list of at-risk packages with
+   their CVEs and CVSS scores.
+3. Intersect the two. The culprit is almost always **transitive** - a package pulled in by
+   the library you added, not the library itself.
+
+Fix it by upgrading the offending package, pinning a patched version through a
+`package.json` `overrides` entry, or choosing a different library that does not carry it.
+Re-run the install so the lockfile reflects the change. Then re-scan and run the guard
+again.
+
+Do not remove the feature to make the number go down, and do not edit the baseline file.
 
 ### Step 5 — Re-scan
 
@@ -104,7 +123,13 @@ export PATH="$HOME/AppData/Roaming/npm:$HOME/.local/bin:$PATH"
 sonar-scanner -Dsonar.token="$SONAR_TOKEN" -Dsonar.branch.name=main
 ```
 
-Wait for the scanner to print `ANALYSIS SUCCESSFUL` before moving on, then return
+Wait for the scanner to print `ANALYSIS SUCCESSFUL`, then re-run the dependency guard:
+
+```bash
+python tools/dependency-risk-guard.py check "$ARTIFACTS_DIR/dep-baseline.json"
+```
+
+You are only done when the quality gate passes **and** that guard exits 0. Then return
 to Step 1. (If `sonar-scanner` is not found, it is installed at
 `$HOME/AppData/Roaming/npm/sonar-scanner`.)
 
