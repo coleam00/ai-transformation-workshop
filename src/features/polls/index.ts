@@ -5,6 +5,7 @@ export {
   PollOptionMismatchError,
   PollOptionNotFoundError,
 } from "./errors";
+export { buildResultsFilename, buildResultsWorkbook } from "./export";
 export type {
   NewPoll,
   NewPollOption,

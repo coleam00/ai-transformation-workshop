@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getResults, hasVoted, PollNotFoundError, type PollResults } from "@/features/polls";
 import { getVoterToken } from "@/features/polls/voter-token";
@@ -77,6 +78,11 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
                 );
               })}
             </ul>
+            <div className="pt-6">
+              <Button asChild variant="outline" size="sm">
+                <a href={`/api/poll/${results.poll.id}/export`}>Export results</a>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
