@@ -2,7 +2,11 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
+import {
+  countLegacyPollsByStatus,
+  countPollsByStatus,
+  getPollsByStatus,
+} from "@/features/admin/audit";
 
 interface AdminPageProps {
   searchParams: Promise<{ status?: string }>;
@@ -14,12 +18,28 @@ interface AdminPollRow {
   description: string | null;
 }
 
+interface StatusCount {
+  status: (typeof STATUSES)[number];
+  live: number;
+  allTime: number;
+}
+
 const STATUSES = ["open", "closed", "archived"] as const;
+
+function getStatusCount(status: (typeof STATUSES)[number]): Promise<StatusCount> {
+  const live = countPollsByStatus(status);
+  return new Promise((resolve) => {
+    countLegacyPollsByStatus(status, (allTime) => {
+      resolve({ status, live, allTime });
+    });
+  });
+}
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { status } = await searchParams;
   const activeStatus = status ?? "open";
 
+  const statusCounts = await Promise.all(STATUSES.map((s) => getStatusCount(s)));
   const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
 
   return (
@@ -36,6 +56,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             Poll audit
           </h1>
         </header>
+
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {statusCounts.map(({ status: s, live, allTime }) => (
+            <Card key={s}>
+              <CardHeader>
+                <CardTitle className="capitalize">{s}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-1">
+                <p className="text-3xl font-semibold text-zinc-950 dark:text-zinc-50">{live}</p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">All time: {allTime}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
 
         <nav className="flex gap-2">
           {STATUSES.map((option) => (
