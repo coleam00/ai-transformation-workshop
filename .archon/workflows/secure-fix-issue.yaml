@@ -1,11 +1,11 @@
-name: poll-app-secure-fix-issue
+name: secure-fix-issue
 description: |
   Use when: User wants to FIX a GitHub issue AND have the result security-verified
   by SonarQube before a pull request is ever opened.
   Triggers: "securely fix issue #123", "fix and security-scan", "secure fix".
-  NOT for: Plain issue fixes with no security gate (use poll-app-fix-issue).
+  NOT for: Plain issue fixes with no security gate (use fix-issue).
 
-  This is poll-app-fix-issue plus a verification gate. The diff is four things:
+  This is fix-issue plus a verification gate. The diff is four things:
   1. a bash node that runs the SonarQube scan  (no AI in it, so it always runs)
   2. an MCP node that reads the quality gate and remediates what fails
   3. a bash node that re-checks the result from the outside (no AI in it either)
@@ -29,7 +29,7 @@ model: sonnet
 
 nodes:
   # ═══════════════════════════════════════════════════════════════
-  # PHASE 1: FETCH & CLASSIFY   (identical to poll-app-fix-issue)
+  # PHASE 1: FETCH & CLASSIFY   (identical to fix-issue)
   # ═══════════════════════════════════════════════════════════════
 
   - id: fetch-issue
@@ -186,7 +186,7 @@ nodes:
   # PHASE 6: CREATE DRAFT PR
   #
   # ADDITION 4 of 4 is the single line below: `depends_on: [verify-gate]`.
-  # In poll-app-fix-issue this reads `depends_on: [implement]`. That edge is
+  # In fix-issue this reads `depends_on: [implement]`. That edge is
   # the entire argument of this workflow: the PR cannot be reached except
   # through a step with no model in it.
   # ═══════════════════════════════════════════════════════════════

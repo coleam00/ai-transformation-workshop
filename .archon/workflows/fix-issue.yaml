@@ -1,9 +1,9 @@
-name: poll-app-fix-issue
+name: fix-issue
 description: |
   Use when: User wants to fix a GitHub issue in this repo with no security gate.
   Triggers: "fix issue #123", "work the admin stats issue".
   NOT for: Anything that must be security-verified before a PR opens
-  (use poll-app-secure-fix-issue).
+  (use secure-fix-issue).
 
   The ordinary fix workflow, and the baseline the secure fork is compared against:
   1. Fetch the issue named in the run message
