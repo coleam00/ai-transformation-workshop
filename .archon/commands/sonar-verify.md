@@ -8,7 +8,7 @@ argument-hint: <github issue request>
 You are the **security verification step** of an Archon workflow. The code for a GitHub
 issue has just been implemented and a SonarQube analysis was already submitted by the
 previous step. Your job: confirm the SonarQube **quality gate passes**, and if it does
-not, **fix the findings and re-scan** — autonomously — until it passes or you hit the
+not, **fix the findings and re-scan** - autonomously - until it passes or you hit the
 3-cycle limit.
 
 Original request: $ARGUMENTS
@@ -33,10 +33,10 @@ nothing else. See "Scope boundary (strict)" below.
 
 ## Tools available to you
 
-- **SonarQube MCP server** (`mcp__sonarqube__*`) — read quality gate status, issues,
+- **SonarQube MCP server** (`mcp__sonarqube__*`) - read quality gate status, issues,
   security hotspots, dependency risks, and rule documentation.
-- **Bash** — to re-run `sonar-scanner` after you fix code.
-- **Read / Edit / Write / Grep / Glob** — to inspect and fix the code.
+- **Bash** - to re-run `sonar-scanner` after you fix code.
+- **Read / Edit / Write / Grep / Glob** - to inspect and fix the code.
 
 ## Context you need
 
@@ -47,27 +47,27 @@ nothing else. See "Scope boundary (strict)" below.
 
 ## Procedure
 
-### Step 1 — Wait for the analysis to finish processing
+### Step 1 - Wait for the analysis to finish processing
 
 The previous step submitted an analysis, but SonarQube processes it asynchronously.
 Wait ~20 seconds, then call `mcp__sonarqube__get_project_quality_gate_status` for this
 project (branch `main`). If it reports the analysis is still pending/processing, wait and
 retry (up to 5 times, ~20s apart).
 
-### Step 2 — Evaluate the quality gate
+### Step 2 - Evaluate the quality gate
 
 Call `mcp__sonarqube__get_project_quality_gate_status`.
 
 - **If the gate status is PASSED / OK** → skip to "Completion (gate passed)".
 - **If the gate status is FAILED / ERROR** → continue to Step 3.
 
-### Step 3 — Enumerate the findings
+### Step 3 - Enumerate the findings
 
 Gather the specific problems that fail the gate:
 
-- `mcp__sonarqube__search_security_hotspots` — security hotspots on this project/branch.
-- `mcp__sonarqube__search_sonar_issues_in_projects` — issues (bugs, vulnerabilities, code smells).
-- `mcp__sonarqube__search_dependency_risks` — SCA / malicious-package / license risks (if Advanced Security is enabled).
+- `mcp__sonarqube__search_security_hotspots` - security hotspots on this project/branch.
+- `mcp__sonarqube__search_sonar_issues_in_projects` - issues (bugs, vulnerabilities, code smells).
+- `mcp__sonarqube__search_dependency_risks` - SCA / malicious-package / license risks (if Advanced Security is enabled).
 
 **Write the list down before you edit anything.** Produce an explicit checklist of every
 gate-failing finding, one line each, in this shape:
@@ -106,17 +106,17 @@ Only the **quality gate status** decides whether this node passes.
 - For any rule you are unsure about, call `mcp__sonarqube__show_rule` to read the rule
   documentation and the recommended remediation.
 
-### Step 4 — Remediate
+### Step 4 - Remediate
 
 For each blocking finding, fix the actual code (Edit/Write). Apply the remediation the
-rule documentation recommends — for example:
+rule documentation recommends - for example:
 - SQL built by string concatenation → use parameterized / prepared statements.
 - Hardcoded credentials/secrets → move to environment variables (`env`), never literals.
 - Weak hashing (MD5/SHA-1) → use a strong algorithm appropriate to the use case.
 Fix the root cause. Do not suppress, mark false-positive, or `// NOSONAR` your way past
 a real finding.
 
-### Step 4b — Dependency risk introduced by this change
+### Step 4b - Dependency risk introduced by this change
 
 A downstream step fails the run if this change increased the project's count of at-risk
 dependencies, so this is blocking. Check it explicitly:
@@ -150,7 +150,7 @@ again.
 
 Do not remove the feature to make the number go down, and do not edit the baseline file.
 
-### Step 5 — Re-scan
+### Step 5 - Re-scan
 
 After fixing, re-submit the analysis:
 
@@ -172,7 +172,7 @@ to Step 1. (If `sonar-scanner` is not found, it is installed at
 ### Cycle limit
 
 Repeat Steps 1–5 at most **3 times**. If after 3 cycles the gate still fails, stop and
-report the remaining findings — do not loop further.
+report the remaining findings - do not loop further.
 
 ## Completion
 
@@ -190,5 +190,5 @@ git add -A && git commit -m "fix: remediate SonarQube quality gate findings"
 ```
 
 End your response with one of:
-- `<promise>GATE_PASSED</promise>` — the quality gate passed.
-- `<promise>GATE_FAILED</promise>` — 3 cycles exhausted, gate still failing.
+- `<promise>GATE_PASSED</promise>` - the quality gate passed.
+- `<promise>GATE_FAILED</promise>` - 3 cycles exhausted, gate still failing.
