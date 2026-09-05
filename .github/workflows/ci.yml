@@ -28,3 +28,26 @@ jobs:
 
       - name: Test
         run: bun test
+
+  sonar:
+    name: SonarQube Cloud
+    runs-on: ubuntu-latest
+    steps:
+      # Sonar needs the full history to work out what is new in this pull
+      # request. A shallow clone makes every line look new.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Cloud scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # Fail the check when the gate is red, so GitHub shows the same verdict
+      # Sonar does instead of a green tick next to a failing analysis.
+      - name: Quality gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
