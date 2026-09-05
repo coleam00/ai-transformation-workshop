@@ -11,6 +11,11 @@ description: |
   3. a bash node that re-checks the result from the outside (no AI in it either)
   4. one dependency edge: create-pr depends on verify-gate, not implement
 
+  Every AI node runs a command file from .archon/commands/ rather than an inline
+  prompt, and passes its data in through `with:` bindings. Models are named by tier
+  (small / medium / large), not by model name, so the same workflow runs on any
+  configured provider.
+
   Full sequence:
   1. Fetch the issue named in the run message
   2. Classify it (bug / feature / enhancement / ...)
@@ -25,7 +30,7 @@ description: |
   Sonar is the verification layer: no code reaches a PR until the gate passes.
 
 provider: claude
-model: sonnet
+model: medium
 
 nodes:
   # ═══════════════════════════════════════════════════════════════
@@ -46,27 +51,11 @@ nodes:
       gh issue view "$ISSUE_NUMBER" --json title,body,labels,comments,state,url,author
 
   - id: classify
-    prompt: |
-      You are an issue classifier. Analyze the GitHub issue below and determine its type.
-
-      ## Issue Content
-
-      $fetch-issue.output
-
-      ## Classification Rules
-
-      | Type | Indicators |
-      |------|------------|
-      | bug | "broken", "error", "crash", "doesn't work", stack traces, regression |
-      | feature | "add", "new", "support", "would be nice", net-new capability |
-      | enhancement | "improve", "better", "update existing", "extend", incremental improvement |
-      | refactor | "clean up", "simplify", "reorganize", "restructure" |
-      | chore | "update deps", "upgrade", "maintenance", "CI/CD" |
-      | documentation | "docs", "readme", "clarify", "examples" |
-
-      Provide reasoning for your classification.
+    command: classify-issue
+    with:
+      issue: $fetch-issue.output
     depends_on: [fetch-issue]
-    model: haiku
+    model: small
     allowed_tools: []
     output_format:
       type: object
@@ -192,33 +181,10 @@ nodes:
   # ═══════════════════════════════════════════════════════════════
 
   - id: create-pr
-    prompt: |
-      Create a draft pull request for the current branch.
-
-      ## Context
-
-      - **Issue**: $ARGUMENTS
-      - **Classification**: $classify.output
-      - **SonarQube verification**: $sonar-verify.output
-
-      ## Instructions
-
-      1. Check git status - ensure all changes are committed. If uncommitted changes exist, stage and commit them.
-      2. Push the branch: `git push -u origin HEAD`
-      3. Read implementation artifacts from `$ARTIFACTS_DIR/` for context:
-         - `$ARTIFACTS_DIR/investigation.md` or `$ARTIFACTS_DIR/plan.md`
-         - `$ARTIFACTS_DIR/implementation.md`
-         - `$ARTIFACTS_DIR/sonar-verification.md`
-      4. Check if a PR already exists: `gh pr list --head $(git branch --show-current)`
-      5. Look for a PR template at `.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE.md`. Read it if it exists.
-      6. Create a DRAFT PR: `gh pr create --draft --base $BASE_BRANCH`
-         - Title: concise, imperative mood, under 70 chars
-         - Body: summary of the fix, then a **SonarQube Verification** section summarizing the
-           quality gate result and any security findings that were auto-remediated.
-         - Link the issue with `Fixes #...`
-      7. Capture PR identifiers:
-         PR_NUMBER=$(gh pr view --json number -q '.number'); echo "$PR_NUMBER" > "$ARTIFACTS_DIR/.pr-number"
-         PR_URL=$(gh pr view --json url -q '.url'); echo "$PR_URL" > "$ARTIFACTS_DIR/.pr-url"
+    command: create-verified-pr
+    with:
+      classification: $classify.output
+      verification: $sonar-verify.output
     depends_on: [verify-gate]
     context: fresh
 
