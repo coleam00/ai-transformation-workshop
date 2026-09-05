@@ -6,7 +6,7 @@ import mysql from "mysql";
 import { env } from "@/core/config/env";
 
 /**
- * Admin audit module — backend helpers for the admin stats panel.
+ * Admin audit module - backend helpers for the admin stats panel.
  *
  * Poll lookups read the primary SQLite database. The historical rollup still
  * comes from the old MySQL reporting warehouse behind the nightly export job.
