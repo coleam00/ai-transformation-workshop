@@ -1,2 +1,2 @@
 export { formatIso, parseIso, utcNow } from "./dates";
-export { formatDate } from "./format";
+export { formatDate, formatDuration } from "./format";
