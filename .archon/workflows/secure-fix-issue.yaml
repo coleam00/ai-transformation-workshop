@@ -156,13 +156,21 @@ nodes:
         exit 1
       fi
 
-      PR_NUMBER=$(tr -dc '0-9' < "$ARTIFACTS_DIR/.pr-number" 2>/dev/null)
+      # Ask GitHub which pull request this branch belongs to, rather than
+      # trusting that the previous node wrote the number down. That node is an
+      # AI node, and a file it was told to write is not a guarantee it did.
+      BRANCH=$(git branch --show-current)
+      PR_NUMBER=$(gh pr list --head "$BRANCH" --state open --json number \
+                    --jq '.[0].number // empty' 2>/dev/null | tr -dc '0-9')
       if [ -z "$PR_NUMBER" ]; then
-        echo "ERROR: no pull request number in the artifacts directory." >&2
+        PR_NUMBER=$(tr -dc '0-9' < "$ARTIFACTS_DIR/.pr-number" 2>/dev/null)
+      fi
+      if [ -z "$PR_NUMBER" ]; then
+        echo "ERROR: no open pull request found for branch '$BRANCH'." >&2
         echo "The pull request must exist before a PR-scoped analysis can run." >&2
         exit 1
       fi
-      BRANCH=$(git branch --show-current)
+      echo "$PR_NUMBER" > "$ARTIFACTS_DIR/.pr-number"
       echo "Analysing PR #${PR_NUMBER} (${BRANCH} into ${BASE_BRANCH})"
 
       # Record what the project already carried BEFORE publishing this analysis,
@@ -209,7 +217,10 @@ nodes:
       set -uo pipefail
       export PATH="$HOME/AppData/Roaming/npm:$HOME/.local/bin:$PATH"
       echo "=== Verifying the result independently of the agent's own report ==="
-      PR_NUMBER=$(tr -dc '0-9' < "$ARTIFACTS_DIR/.pr-number" 2>/dev/null)
+      PR_NUMBER=$(gh pr list --head "$(git branch --show-current)" --state open                     --json number --jq '.[0].number // empty' 2>/dev/null | tr -dc '0-9')
+      if [ -z "$PR_NUMBER" ]; then
+        PR_NUMBER=$(tr -dc '0-9' < "$ARTIFACTS_DIR/.pr-number" 2>/dev/null)
+      fi
       if [ -z "$PR_NUMBER" ]; then
         echo "ERROR: no pull request number to verify." >&2
         exit 1
@@ -230,11 +241,47 @@ nodes:
   - id: ready-pr
     bash: |
       set -uo pipefail
-      PR_NUMBER=$(tr -dc '0-9' < "$ARTIFACTS_DIR/.pr-number" 2>/dev/null)
+      PR_NUMBER=$(gh pr list --head "$(git branch --show-current)" --state open                     --json number --jq '.[0].number // empty' 2>/dev/null | tr -dc '0-9')
+      if [ -z "$PR_NUMBER" ]; then
+        PR_NUMBER=$(tr -dc '0-9' < "$ARTIFACTS_DIR/.pr-number" 2>/dev/null)
+      fi
       if [ -z "$PR_NUMBER" ]; then
         echo "ERROR: no pull request number to mark ready." >&2
         exit 1
       fi
+
+      # Push the remediation. sonar-scanner reads the working tree, so the gate can
+      # go green on commits GitHub has never seen. Pushing here, deterministically,
+      # is what keeps the two halves talking about the same code: the commit Sonar
+      # passed is the commit on the pull request. A red gate never reaches this
+      # node, so a failed run leaves the unfixed code on the draft, which is right.
+      echo "=== Publishing the verified commits ==="
+      git push origin HEAD
+
+      # The pull request opened BEFORE the scan, so its body cannot already carry
+      # the verification. Append the gate's own report now.
+      REPORT="$ARTIFACTS_DIR/sonar-verification.md"
+      if [ -f "$REPORT" ]; then
+        gh pr view "$PR_NUMBER" --json body --jq '.body' > "$ARTIFACTS_DIR/.pr-body"
+        if grep -q "^## SonarQube Verification" "$ARTIFACTS_DIR/.pr-body"; then
+          echo "The body already carries the verification section, leaving it alone."
+        else
+          {
+            cat "$ARTIFACTS_DIR/.pr-body"
+            echo ""
+            echo "---"
+            echo ""
+            echo "## SonarQube Verification"
+            echo ""
+            cat "$REPORT"
+          } > "$ARTIFACTS_DIR/.pr-body-final"
+          gh pr edit "$PR_NUMBER" --body-file "$ARTIFACTS_DIR/.pr-body-final"
+          echo "Appended the gate report to PR #${PR_NUMBER}"
+        fi
+      else
+        echo "WARNING: no sonar-verification.md in the artifacts directory" >&2
+      fi
+
       echo "=== Quality gate is green. Marking PR #${PR_NUMBER} ready for review ==="
       gh pr ready "$PR_NUMBER"
       gh pr view "$PR_NUMBER" --json url -q '.url'

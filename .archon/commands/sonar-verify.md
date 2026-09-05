@@ -185,11 +185,28 @@ report the remaining findings - do not loop further.
 ## Completion
 
 When you finish (gate passed, or 3 cycles exhausted), write a markdown report to
-`$ARTIFACTS_DIR/sonar-verification.md` with:
+`$ARTIFACTS_DIR/sonar-verification.md`.
 
-- Final quality gate status (PASSED / FAILED).
-- A cycle-by-cycle log: for each cycle, the findings detected and what you changed.
-- The list of files you modified.
+**This report is appended to the pull request body**, so write it for the reviewer who has
+to approve the change, not as a lab notebook. Keep it under 40 lines and stick to this
+shape:
+
+```markdown
+**Quality gate: PASSED** (or FAILED) · cycles used: N of 3
+
+| Rule | Location | Finding | Fix |
+|---|---|---|---|
+| `typescript:S2077` | `src/features/admin/audit.ts:66` | ... | ... |
+
+**Before → after:** `new_vulnerabilities` 3 → 0 · `new_security_rating` E → A
+**Dependency risk:** at-risk dependencies 45 → 45 (no change)
+**Files changed:** `src/features/admin/audit.ts`
+```
+
+Report only what a reviewer needs: which rules fired, where, what you changed, and the
+gate numbers on both sides. Leave out your own investigation narrative, anything you read
+in the repository's history, and anything you ruled out. If a cycle failed and you retried,
+that is one line, not a section.
 
 Then commit your fixes:
 

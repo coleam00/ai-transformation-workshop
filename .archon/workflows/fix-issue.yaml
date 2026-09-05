@@ -105,7 +105,7 @@ nodes:
   # ═══════════════════════════════════════════════════════════════
 
   - id: create-pr
-    command: create-draft-pr
+    command: create-pr
     with:
       classification: $classify.output
     depends_on: [implement]
