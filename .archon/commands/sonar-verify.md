@@ -14,6 +14,23 @@ not, **fix the findings and re-scan** — autonomously — until it passes or yo
 Original request: $ARGUMENTS
 Workflow artifacts directory: $ARTIFACTS_DIR
 
+## The repo's Change Scope rule does NOT apply to you
+
+`CLAUDE.md` tells feature work to stay inside the ticket's surface and to *report* unrelated
+problems, including security weaknesses, under a `Noticed, not fixed` heading rather than
+fixing them. **That rule governs the implement step. It does not govern this step.**
+
+You are the remediation step. **Every finding that is failing the quality gate is in scope for
+you by definition**, whether or not the ticket named the file, the function or the module it
+lives in. A finding in a file the ticket never mentioned is still yours to fix.
+
+If you find yourself about to write "out of scope for this ticket" about a gate-failing
+finding, that is the mistake this section exists to prevent. Report it only if you have
+genuinely tried to fix it and cannot, and say why.
+
+The scope limit that *does* apply to you is the opposite one: fix the gate findings and
+nothing else. See "Scope boundary (strict)" below.
+
 ## Tools available to you
 
 - **SonarQube MCP server** (`mcp__sonarqube__*`) — read quality gate status, issues,
@@ -52,12 +69,31 @@ Gather the specific problems that fail the gate:
 - `mcp__sonarqube__search_sonar_issues_in_projects` — issues (bugs, vulnerabilities, code smells).
 - `mcp__sonarqube__search_dependency_risks` — SCA / malicious-package / license risks (if Advanced Security is enabled).
 
+**Write the list down before you edit anything.** Produce an explicit checklist of every
+gate-failing finding, one line each, in this shape:
+
+```
+[ ] typescript:S2077  src/features/admin/audit.ts:66   SQL from string interpolation
+[ ] typescript:S2068  src/features/admin/audit.ts:17   hardcoded password
+[ ] typescript:S4790  src/features/admin/audit.ts:78   MD5 used for a session id
+```
+
+The gate reported N findings, so your checklist has N lines. **Do not move to Step 5 until
+every line is ticked with an actual edit.** If you re-scan while any line is unticked, you
+have skipped work, and the deterministic guard after you will catch it and fail the run.
+
+Count your ticks against N out loud in your summary. "3 of 3 fixed" or "2 of 3 fixed, and
+here is why the third could not be" - never silence about the difference.
+
 ### Scope boundary (strict)
 
 Only the **quality gate status** decides whether this node passes.
 
-- Fix **only** the findings that are failing the gate, plus any **dependency risk this
-  change introduced** (see below). Nothing else.
+- Fix **every** finding that is failing the gate, plus any **dependency risk this change
+  introduced** (see below), and nothing else. "Every" is not negotiable: if the gate reports
+  three findings, you fix three. Pre-existing, untouched by the ticket, in a module nobody
+  named, an old helper that predates the repo - none of that puts a gate-failing finding out
+  of your scope. The gate is the definition of your scope.
 - Do **not** refactor, restructure, or "harden while you are in there". No new features,
   no new modules, no rate limiting, no schema or migration changes, no dependency changes,
   no test scaffolding beyond what a gate finding requires.
