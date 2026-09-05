@@ -2,7 +2,11 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
+import {
+  countLegacyPollsByStatus,
+  countPollsByStatus,
+  getPollsByStatus,
+} from "@/features/admin/audit";
 
 interface AdminPageProps {
   searchParams: Promise<{ status?: string }>;
@@ -14,11 +18,31 @@ interface AdminPollRow {
   description: string | null;
 }
 
+interface StatusStat {
+  status: (typeof STATUSES)[number];
+  live: number;
+  allTime: number;
+}
+
 const STATUSES = ["open", "closed", "archived"] as const;
+
+function getLegacyCount(status: string): Promise<number> {
+  return new Promise((resolve) => {
+    countLegacyPollsByStatus(status, resolve);
+  });
+}
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { status } = await searchParams;
   const activeStatus = status ?? "open";
+
+  const stats: StatusStat[] = await Promise.all(
+    STATUSES.map(async (statusOption) => ({
+      status: statusOption,
+      live: countPollsByStatus(statusOption),
+      allTime: await getLegacyCount(statusOption),
+    })),
+  );
 
   const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
 
@@ -36,6 +60,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             Poll audit
           </h1>
         </header>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {stats.map((stat) => (
+            <Card key={stat.status}>
+              <CardHeader>
+                <CardTitle>{stat.status.charAt(0).toUpperCase() + stat.status.slice(1)}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
+                  {stat.live}
+                </p>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                  All time: {stat.allTime}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
         <nav className="flex gap-2">
           {STATUSES.map((option) => (
