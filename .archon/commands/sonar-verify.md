@@ -42,7 +42,16 @@ nothing else. See "Scope boundary (strict)" below.
 
 - **Project key & organization**: read them from `sonar-project.properties` in the repo root.
   For this repo that is `coleam00_archon-secure-demo` in organization `coleam00`.
-- **Branch**: all scans and gate checks target the `main` branch on SonarQube Cloud.
+- **Pull request**: this run analyses a PULL REQUEST, not a branch. Its number is in
+  `$ARTIFACTS_DIR/.pr-number`. Read it once at the start and use it everywhere:
+
+  ```bash
+  PR_NUMBER=$(tr -dc '0-9' < "$ARTIFACTS_DIR/.pr-number")
+  ```
+
+  Every gate check and every re-scan must be scoped to that pull request. A pull
+  request is judged on NEW code only, so a branch-scoped or main-scoped check here
+  would be answering a different question from the one that decides the run.
 - **Token**: `SONAR_TOKEN` is already exported in the environment for `sonar-scanner`.
 
 ## Procedure
@@ -51,8 +60,8 @@ nothing else. See "Scope boundary (strict)" below.
 
 The previous step submitted an analysis, but SonarQube processes it asynchronously.
 Wait ~20 seconds, then call `mcp__sonarqube__get_project_quality_gate_status` for this
-project (branch `main`). If it reports the analysis is still pending/processing, wait and
-retry (up to 5 times, ~20s apart).
+project, **scoped to the pull request** (`pullRequest: <PR_NUMBER>`). If it reports the
+analysis is still pending/processing, wait and retry (up to 5 times, ~20s apart).
 
 ### Step 2 - Evaluate the quality gate
 
@@ -127,12 +136,10 @@ python tools/dependency-risk-guard.py check "$ARTIFACTS_DIR/dep-baseline.json"
 
 Exit 0 means clear. Non-zero means **this change added dependency risk and you must fix it**.
 
-> **Do not rely on the `newlyIntroduced` flag from `search_dependency_risks` here.** That
-> flag is only computed for a branch measured against the project's main branch. This
-> workflow publishes its analysis *as* `main`, so there is nothing to compare against and
-> the flag reads `false` for everything, including packages this change just added. The
-> guard above compares against a baseline captured before the analysis was published, which
-> is why it is the thing that decides.
+> **Do not rely on the `newlyIntroduced` flag from `search_dependency_risks` here.** It has
+> been unreliable on this project, reading `false` for packages the change had just added.
+> The guard above compares against a baseline captured before the analysis was published,
+> which is why it is the thing that decides.
 
 To find *which* package, when the guard fails:
 
@@ -156,7 +163,8 @@ After fixing, re-submit the analysis:
 
 ```bash
 export PATH="$HOME/AppData/Roaming/npm:$HOME/.local/bin:$PATH"
-sonar-scanner -Dsonar.token="$SONAR_TOKEN" -Dsonar.branch.name=main
+PR_NUMBER=$(tr -dc '0-9' < "$ARTIFACTS_DIR/.pr-number")
+sonar-scanner \n  -Dsonar.token="$SONAR_TOKEN" \n  -Dsonar.pullrequest.key="$PR_NUMBER" \n  -Dsonar.pullrequest.branch="$(git branch --show-current)" \n  -Dsonar.pullrequest.base="$BASE_BRANCH"
 ```
 
 Wait for the scanner to print `ANALYSIS SUCCESSFUL`, then re-run the dependency guard:

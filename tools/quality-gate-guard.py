@@ -68,11 +68,33 @@ def wait_for_analysis(tries=18, delay=10):
 
 
 def main():
-    branch = sys.argv[1] if len(sys.argv) > 1 else "main"
+    # Two addressing modes, because the analysis this guard checks can be either
+    # a branch analysis or a pull-request one:
+    #
+    #   quality-gate-guard.py main       branch analysis
+    #   quality-gate-guard.py --pr 123   pull-request analysis
+    #
+    # A pull request is judged on NEW code only, so the gate needs new-code
+    # conditions for this to mean anything. Without them every condition comes
+    # back `None`, the status is OK, and this guard waves through a red PR.
+    args = sys.argv[1:]
+    scope = {}
+    label = ""
+    if args and args[0] == "--pr":
+        if len(args) < 2 or not args[1].strip():
+            sys.exit("quality-gate-guard: --pr needs a pull request number")
+        scope = {"pullRequest": args[1].strip()}
+        label = f"pull request #{args[1].strip()}"
+    else:
+        branch = args[0] if args else "main"
+        scope = {"branch": branch}
+        label = f"branch {branch}"
+
+    print(f"quality-gate-guard: checking {label}")
     wait_for_analysis()
 
     ps = api("/api/qualitygates/project_status",
-             projectKey=PROJECT, branch=branch).get("projectStatus", {})
+             projectKey=PROJECT, **scope).get("projectStatus", {})
     status = ps.get("status")
 
     for c in ps.get("conditions", []):
