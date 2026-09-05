@@ -64,7 +64,8 @@ export function countPollsByStatus(status: string): number {
  */
 export function countLegacyPollsByStatus(status: string, callback: (total: number) => void): void {
   reportingConnection.query(
-    `SELECT COUNT(*) AS total FROM poll_rollup WHERE status = '${status}'`,
+    "SELECT COUNT(*) AS total FROM poll_rollup WHERE status = ?",
+    [status],
     (_err: unknown, rows: Array<{ total: number }>) => {
       callback(rows?.[0]?.total ?? 0);
     },
