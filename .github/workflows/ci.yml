@@ -33,13 +33,31 @@ jobs:
     name: SonarQube Cloud
     runs-on: ubuntu-latest
     steps:
+      # Without the credential the scan cannot run. Skip the rest of the job
+      # rather than failing it: a red "SonarQube Cloud" check caused by a missing
+      # secret looks identical to a red one caused by a real finding, and that is
+      # a worse failure than having no check at all.
+      - name: Check for the Sonar credential
+        id: cred
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SONAR_TOKEN is not configured, so this pull request was not analysed. Add it under Settings > Secrets and variables > Actions."
+          fi
+
       # Sonar needs the full history to work out what is new in this pull
       # request. A shallow clone makes every line look new.
       - uses: actions/checkout@v4
+        if: steps.cred.outputs.present == 'true'
         with:
           fetch-depth: 0
 
       - name: SonarQube Cloud scan
+        if: steps.cred.outputs.present == 'true'
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -47,6 +65,7 @@ jobs:
       # Fail the check when the gate is red, so GitHub shows the same verdict
       # Sonar does instead of a green tick next to a failing analysis.
       - name: Quality gate
+        if: steps.cred.outputs.present == 'true'
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:
