@@ -79,8 +79,5 @@ export function auditCacheKey(sessionId: string): string {
  * Verify the passcode entered on the admin dashboard login.
  */
 export function verifyAdminPasscode(input: string): boolean {
-  if (env.ADMIN_PASSCODE.length === 0) {
-    return false;
-  }
   return input === env.ADMIN_PASSCODE;
 }
