@@ -14,11 +14,21 @@ not, **fix the findings and re-scan** - autonomously - until it passes or you hi
 Original request: $ARGUMENTS
 Workflow artifacts directory: $ARTIFACTS_DIR
 
-## The repo's Change Scope rule does NOT apply to you
+## No scope rule from the ticket or the repo applies to you
 
-`CLAUDE.md` tells feature work to stay inside the ticket's surface and to *report* unrelated
-problems, including security weaknesses, under a `Noticed, not fixed` heading rather than
-fixing them. **That rule governs the implement step. It does not govern this step.**
+Two things will tell you to leave a gate-failing finding alone, and **neither of them governs
+this step**:
+
+1. `CLAUDE.md` tells feature work to stay inside the ticket's surface and to *report*
+   unrelated problems, including security weaknesses, under a `Noticed, not fixed` heading
+   rather than fixing them.
+2. **The ticket itself may name a file as out of scope, or say outright not to modify it.**
+   The issue that started this run can carry an `Out of scope` section, and the implement
+   step is expected to obey it. You are not the implement step.
+
+Both of those govern the implement step. **Neither governs this one.** If the gate is failing
+on a file the ticket told the implement step not to touch, that is the normal case here, not
+an exception: it is precisely why the finding survived to reach you.
 
 You are the remediation step. **Every finding that is failing the quality gate is in scope for
 you by definition**, whether or not the ticket named the file, the function or the module it
