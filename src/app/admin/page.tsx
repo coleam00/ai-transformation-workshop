@@ -2,7 +2,11 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPollsByStatus } from "@/features/admin/audit";
+import {
+  countLegacyPollsByStatus,
+  countPollsByStatus,
+  getPollsByStatus,
+} from "@/features/admin/audit";
 
 interface AdminPageProps {
   searchParams: Promise<{ status?: string }>;
@@ -14,12 +18,59 @@ interface AdminPollRow {
   description: string | null;
 }
 
+interface StatusCount {
+  status: (typeof STATUSES)[number];
+  live: number;
+  allTime: number;
+}
+
 const STATUSES = ["open", "closed", "archived"] as const;
+
+const STATUS_LABELS: Record<(typeof STATUSES)[number], string> = {
+  open: "Open",
+  closed: "Closed",
+  archived: "Archived",
+};
+
+const LEGACY_LOOKUP_TIMEOUT_MS = 2000;
+
+function getLegacyTotal(status: string): Promise<number> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve(0);
+      }
+    }, LEGACY_LOOKUP_TIMEOUT_MS);
+
+    countLegacyPollsByStatus(status, (total) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(total);
+      }
+    });
+  });
+}
+
+async function loadStatusCounts(): Promise<StatusCount[]> {
+  return Promise.all(
+    STATUSES.map(async (status) => ({
+      status,
+      live: countPollsByStatus(status),
+      allTime: await getLegacyTotal(status),
+    })),
+  );
+}
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { status } = await searchParams;
-  const activeStatus = status ?? "open";
+  const activeStatus = STATUSES.includes(status as (typeof STATUSES)[number])
+    ? (status as (typeof STATUSES)[number])
+    : "open";
 
+  const counts = await loadStatusCounts();
   const polls = getPollsByStatus(activeStatus) as AdminPollRow[];
 
   return (
@@ -37,6 +88,32 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </h1>
         </header>
 
+        <div className="grid gap-4 sm:grid-cols-3">
+          {counts.map((count) => (
+            <Card key={count.status}>
+              <CardHeader>
+                <CardTitle>{STATUS_LABELS[count.status]}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
+                      {count.live}
+                    </p>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">Live</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
+                      {count.allTime}
+                    </p>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">All time</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
         <nav className="flex gap-2">
           {STATUSES.map((option) => (
             <Link
@@ -48,14 +125,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   : "rounded-md border border-zinc-200 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
               }
             >
-              {option}
+              {STATUS_LABELS[option]}
             </Link>
           ))}
         </nav>
 
         <Card>
           <CardHeader>
-            <CardTitle>Polls with status &ldquo;{activeStatus}&rdquo;</CardTitle>
+            <CardTitle>Polls with status &ldquo;{STATUS_LABELS[activeStatus]}&rdquo;</CardTitle>
           </CardHeader>
           <CardContent>
             {polls.length === 0 ? (
